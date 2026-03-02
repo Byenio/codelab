@@ -1,43 +1,42 @@
 #include <crow.h>
-#include <sqlite3.h>
 #include <git2.h>
 #include <iostream>
+#include "core/db.h"
 
-int main() {
-  // 1. Initialize Libgit2
+int main(int argc, char** argv) {
   git_libgit2_init();
-  std::cout << "[+] Libgit2 initialized" << std::endl;
 
-  // 2. Initialize SQLite
-  sqlite3* db;
-  int rc = sqlite3_open(":memory:", &db); // In-memory DB for test
-  if (rc) {
-    std::cerr << "[-] Can't open database: " << sqlite3_errmsg(db) << std::endl;
+  try
+  {
+    auto& db = codelab::core::Database::GetInstance();
+
+    db.Connect("../../data/codelab.db");
+
+    db.ApplySchema("db/schema.sql");
+  } catch (const std::exception& e)
+  {
+    std::cerr << "[!] Initialization error: " << e.what() << std::endl;
+    git_libgit2_shutdown();
+
     return 1;
-  } else {
-    std::cout << "[+] SQLite3 initialized (in-memory)" << std::endl;
   }
-  sqlite3_close(db);
 
-  // 3. Start Crow Server
   crow::SimpleApp app;
 
-  CROW_ROUTE(app, "/")([](){
-      return "codelab backend is running!";
+  CROW_ROUTE(app, "/") ([]()
+  {
+    return "Codelab is running";
   });
 
-  CROW_ROUTE(app, "/status")([](){
-      crow::json::wvalue x;
-      x["service"] = "codelab";
-      x["status"] = "online";
-      x["git_version"] = "libgit2";
-      return x;
+  CROW_ROUTE(app, "/health") ([]()
+  {
+    crow::json::wvalue res;
+    res["status"] = "ok";
+    res["db"] = "connected";
+    return res;
   });
 
   std::cout << "[+] Starting codelab server on port 8080..." << std::endl;
-
-  // Shutdown libgit2 on exit
-  // In a real app, use RAII or atexit
   app.port(8080).multithreaded().run();
 
   git_libgit2_shutdown();
