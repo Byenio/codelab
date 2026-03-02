@@ -2,6 +2,8 @@
 #include <git2.h>
 #include <iostream>
 #include "core/db.h"
+#include "dao/user_dao.h"
+#include "middleware/auth_middleware.h"
 
 int main(int argc, char** argv) {
   git_libgit2_init();
@@ -9,19 +11,16 @@ int main(int argc, char** argv) {
   try
   {
     auto& db = codelab::core::Database::GetInstance();
-
     db.Connect("../../data/codelab.db");
-
     db.ApplySchema("db/schema.sql");
   } catch (const std::exception& e)
   {
-    std::cerr << "[!] Initialization error: " << e.what() << std::endl;
+    std::cerr << "[!] Database error: " << e.what() << std::endl;
     git_libgit2_shutdown();
-
     return 1;
   }
 
-  crow::SimpleApp app;
+  crow::App<codelab::middleware::AuthMiddleware> app;
 
   CROW_ROUTE(app, "/") ([]()
   {
@@ -34,6 +33,31 @@ int main(int argc, char** argv) {
     res["status"] = "ok";
     res["db"] = "connected";
     return res;
+  });
+
+  CROW_ROUTE(app, "/api/v1/register").methods(crow::HTTPMethod::POST) ([](const crow::request& req)
+  {
+    auto x = crow::json::load(req.body);
+    if (!x) return crow::response(400, "Invalid JSON");
+
+    std::string username = x["username"].s();
+    std::string password = x["password"].s();
+    std::string email = x["email"].s();
+
+    codelab::dao::UserDAO dao;
+
+    // TODO: check if user exists using dao.FindByXyz(username)
+
+    if (auto user = dao.Create(username, password, email))
+    {
+      crow::json::wvalue res;
+      res["id"] = user->id;
+      res["username"] = user->username;
+      return crow::response(201, res);
+    } else
+    {
+      return crow::response(500, "Failed to create user");
+    }
   });
 
   std::cout << "[+] Starting codelab server on port 8080..." << std::endl;
