@@ -48,5 +48,5 @@ CREATE TABLE IF NOT EXISTS repositories (
     UNIQUE(user_id, directory_id, name)
 );
 
-CREATE INDEX idx_directories_parent ON directories(parent_id);
-CREATE INDEX idx_repositories_owner ON repositories(user_id);
+CREATE INDEX IF NOT EXISTS idx_directories_parent ON directories(parent_id);
+CREATE INDEX IF NOT EXISTS idx_repositories_owner ON repositories(user_id);

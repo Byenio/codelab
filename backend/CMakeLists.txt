@@ -1,4 +1,6 @@
-file(GLOB_RECURSE SRC_FILES "src/*.cc")
+file(GLOB_RECURSE SRC_FILES CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cc"
+)
 
 add_executable(codelab_server ${SRC_FILES})
 
