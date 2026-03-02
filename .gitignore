@@ -1,0 +1,60 @@
+# --- IDEs & Editors ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*.user
+
+# --- C++ / CMake Build Artifacts ---
+cmake-build-*/
+build/
+out/
+bin/
+lib/
+CMakeCache.txt
+CMakeFiles/
+*.cmake
+Makefile
+*.ninja
+
+# --- Compiled Binaries & Libraries ---
+*.exe
+*.dll
+*.lib
+*.a
+*.so
+*.dylib
+*.pdb
+*.ilk
+*.exp
+*.obj
+*.o
+
+# --- vcpkg ---
+# We keep vcpkg.json, but ignore the installed packages folder
+vcpkg_installed/
+vcpkg/
+
+# --- Frontend (Vue.js / Node) ---
+frontend/node_modules/
+frontend/dist/
+frontend/npm-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/.env.local
+frontend/.env.*.local
+frontend/.DS_Store
+
+# --- Runtime Data (Crucial!) ---
+# Ignore the actual database and git repositories stored on disk
+data/*
+!data/.gitkeep
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# --- OS Generated ---
+.DS_Store
+Thumbs.db
+Desktop.ini

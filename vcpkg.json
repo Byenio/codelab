@@ -1,0 +1,10 @@
+{
+  "name": "codelab",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "crow",
+    "libgit2",
+    "sqlite3",
+    "nlohmann-json"
+  ]
+}
