@@ -3,6 +3,8 @@
 #include <iostream>
 #include "core/db.h"
 #include "dao/user_dao.h"
+#include "dao/repository_dao.h"
+#include "dao/directory_dao.h"
 #include "middleware/auth_middleware.h"
 
 int main(int argc, char** argv) {
@@ -58,6 +60,41 @@ int main(int argc, char** argv) {
     {
       return crow::response(500, "Failed to create user");
     }
+  });
+
+  CROW_ROUTE(app, "/api/test_structure")([](){
+      codelab::dao::UserDAO userDao;
+      codelab::dao::DirectoryDAO dirDao;
+      codelab::dao::RepositoryDAO repoDao;
+
+      int user_id = 0;
+      auto existing_user = userDao.FindByUsername("tester");
+
+      if (existing_user) {
+          user_id = existing_user->id;
+      } else {
+          auto new_user = userDao.Create("tester", "hashed_secret", "test@code.lab");
+          if (!new_user) return crow::response(500, "[!] Failed to create test user");
+          user_id = new_user->id;
+      }
+
+      auto root_id = dirDao.Create(user_id, std::nullopt, "polsl");
+      if (!root_id) return crow::response(500, "[!] Failed to create root directory");
+
+      auto embedded_id = dirDao.Create(user_id, *root_id, "sem-6");
+      if (!embedded_id) return crow::response(500, "Failed to create embedded directory");
+
+      codelab::models::Repository repo;
+      repo.user_id = user_id;
+      repo.directory_id = *embedded_id;
+      repo.name = "project";
+      repo.disk_path_hash = "uuid-1234-5678";
+      repo.is_private = true;
+
+      if (repoDao.Create(repo)) {
+          return crow::response(200, "created structure: User(" + std::to_string(user_id) + ")/polsl/sem-6/project");
+      }
+      return crow::response(500, "[!] Failed to create repo");
   });
 
   std::cout << "[+] Starting codelab server on port 8080..." << std::endl;
