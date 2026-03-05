@@ -38,9 +38,11 @@ namespace codelab::dao
     sqlite3_stmt* stmt;
 
     std::string sql;
-    if (directory_id.has_value()) {
+    if (directory_id.has_value())
+    {
       sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash FROM repositories WHERE user_id=? AND directory_id=? AND name=?;";
-    } else {
+    } else
+    {
       sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash FROM repositories WHERE user_id=? AND directory_id IS NULL AND name=?;";
     }
 
@@ -62,5 +64,48 @@ namespace codelab::dao
     }
     sqlite3_finalize(stmt);
     return std::nullopt;
+  }
+
+  std::vector<models::Repository> RepositoryDAO::ListByDirectory(int user_id, std::optional<int> directory_id)
+  {
+    std::vector<models::Repository> results;
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+
+    std::string sql;
+    if (directory_id.has_value())
+    {
+      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash FROM repositories WHERE user_id=? AND directory_id=?;";
+    } else
+    {
+      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash FROM repositories WHERE user_id=? AND directory_id IS NULL;";
+    }
+
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return results;
+
+    sqlite3_bind_int(stmt, 1, user_id);
+    if (directory_id.has_value())
+    {
+      sqlite3_bind_int(stmt, 2, directory_id.value());
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+      models::Repository repo;
+      repo.id = sqlite3_column_int(stmt, 0);
+      repo.user_id = sqlite3_column_int(stmt, 1);
+      if (sqlite3_column_type(stmt, 2) != SQLITE_NULL)
+      {
+        repo.directory_id = sqlite3_column_int(stmt, 2);
+      }
+      repo.name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 3));
+      repo.description = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 4));
+      repo.disk_path_hash = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 5));
+      repo.is_private = sqlite3_column_int(stmt, 6) != 0;
+      results.push_back(repo);
+    }
+
+    sqlite3_finalize(stmt);
+    return results;
   }
 }

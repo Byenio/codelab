@@ -13,6 +13,7 @@ namespace codelab::dao
     std::optional<int> Create(const models::Repository& repo);
 
     std::optional<models::Repository> FindByName(int user_id, std::optional<int> directory_id, const std::string& name);
+    std::vector<models::Repository> ListByDirectory(int user_id, std::optional<int> directory_id);
   };
 }
 
