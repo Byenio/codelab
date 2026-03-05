@@ -1,0 +1,62 @@
+#include "services/repo_service.h"
+#include <random>
+#include <sstream>
+#include <iostream>
+
+namespace codelab::services
+{
+  RepoService::RepoService() : storage_("../../data/repositories") {}
+
+  std::string RepoService::GenerateDiskHash()
+  {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dis(0, 15);
+
+    std::stringstream ss;
+    for (int i = 0; i < 32; ++i)
+    {
+      ss << std::hex << dis(gen);
+    }
+
+    return ss.str();
+  }
+
+  std::optional<models::Repository> RepoService::CreateRepository(int user_id, std::optional<int> parent_id, const std::string &name, const std::string &description, bool is_private)
+  {
+    if (parent_id.has_value())
+    {
+      // TODO: if parent_id is provided, does it exist and belong to user
+    }
+
+    auto existing = repo_dao_.FindByName(user_id, parent_id, name);
+    if (existing.has_value())
+    {
+      std::cerr << "[!] Repo with this name already exists in this folder" << std::endl;
+      return std::nullopt;
+    }
+
+    models::Repository repo;
+    repo.user_id = user_id;
+    repo.directory_id = parent_id;
+    repo.name = name;
+    repo.description = description;
+    repo.is_private = is_private;
+    repo.disk_path_hash = GenerateDiskHash();
+
+    if (!storage_.InitRepo(repo.disk_path_hash))
+    {
+      return std::nullopt;
+    }
+
+    auto id = repo_dao_.Create(repo);
+    if (!id.has_value())
+    {
+      storage_.DeleteRepo(repo.disk_path_hash);
+      return std::nullopt;
+    }
+
+    repo.id = id.value();
+    return repo;
+  }
+}
