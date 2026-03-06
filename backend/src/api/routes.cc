@@ -1,4 +1,6 @@
 #include "api/routes.h"
+
+#include "core/config.h"
 #include "dao/repository_dao.h"
 #include "dao/directory_dao.h"
 #include "git/git_viewer.h"
@@ -140,7 +142,8 @@ namespace codelab::api
       auto repo = repo_dao.FindById(repo_id);
       if (!repo) return crow::response(404, "Repository not found");
 
-      std::string full_path = "../../data/repositories/" + repo->disk_path_hash + ".git";
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
+      std::string full_path = storage_path + repo->disk_path_hash + ".git";
 
       git::GitViewer viewer(full_path);
       auto branches = viewer.GetBranches();
@@ -166,7 +169,8 @@ namespace codelab::api
       if (!repo) return crow::response(404, "Repository not found");
 
       std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "HEAD";
-      std::string full_path = "../../data/repositories/" + repo->disk_path_hash + ".git";
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
+      std::string full_path = storage_path + repo->disk_path_hash + ".git";
 
       git::GitViewer viewer(full_path);
       auto commits = viewer.GetCommits(branch);

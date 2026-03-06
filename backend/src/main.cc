@@ -3,20 +3,21 @@
 #include <iostream>
 
 #include "api/routes.h"
+#include "core/config.h"
 #include "core/db.h"
-#include "dao/user_dao.h"
-#include "dao/repository_dao.h"
-#include "dao/directory_dao.h"
 #include "middleware/auth_middleware.h"
-#include "services/repo_service.h"
 
 int main(int argc, char** argv) {
+  auto& config = codelab::core::Config::GetInstance();
+  config.Load("../../.env");
+
   git_libgit2_init();
 
   try
   {
     auto& db = codelab::core::Database::GetInstance();
-    db.Connect("../../data/codelab.db");
+    std::string db_path = config.GetString("DB_PATH", "../../data/codelab.db");
+    db.Connect(db_path);
     db.ApplySchema("db/schema.sql");
   } catch (const std::exception& e)
   {
@@ -28,8 +29,9 @@ int main(int argc, char** argv) {
   crow::App<codelab::middleware::AuthMiddleware> app;
   codelab::api::RegisterRoutes(app);
 
-  std::cout << "[+] Starting codelab server on port 8080..." << std::endl;
-  app.port(8080).multithreaded().run();
+  int app_port = config.GetInt("PORT", 8080);
+  std::cout << "[+] Starting codelab server on port " << app_port << std::endl;
+  app.port(app_port).multithreaded().run();
 
   git_libgit2_shutdown();
   return 0;
