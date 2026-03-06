@@ -34,13 +34,14 @@ add_executable(codelab_tests
         tests/git_tests.cc
         tests/service_tests.cc
         tests/auth_tests.cc
+        tests/api_tests.cc
 )
 
 target_include_directories(codelab_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(codelab_tests PRIVATE codelab_lib GTest::gtest)
+target_link_libraries(codelab_tests PRIVATE codelab_lib GTest::gtest cpr::cpr)
 
 include(GoogleTest)
 gtest_discover_tests(codelab_tests)

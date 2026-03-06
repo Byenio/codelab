@@ -9,5 +9,6 @@ find_package(nlohmann_json CONFIG REQUIRED)
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
 find_package(libgit2 CONFIG REQUIRED)
 find_package(jwt-cpp CONFIG REQUIRED)
+find_package(cpr CONFIG REQUIRED)
 
 add_subdirectory(backend)
