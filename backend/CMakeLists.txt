@@ -33,6 +33,7 @@ add_executable(codelab_tests
         tests/dao_tests.cc
         tests/git_tests.cc
         tests/service_tests.cc
+        tests/auth_tests.cc
 )
 
 target_include_directories(codelab_tests PRIVATE
