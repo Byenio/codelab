@@ -5,7 +5,7 @@
 
 namespace codelab::services
 {
-  RepoService::RepoService() : storage_("../../data/repositories") {}
+  RepoService::RepoService(std::string root_path) : storage_(std::move(root_path)) {}
 
   std::string RepoService::GenerateDiskHash()
   {

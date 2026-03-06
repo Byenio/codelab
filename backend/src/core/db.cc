@@ -83,4 +83,13 @@ namespace codelab::core
   {
     return db_;
   }
+
+  void Database::Disconnect()
+  {
+    if (db_)
+    {
+      sqlite3_close(db_);
+      db_ = nullptr;
+    }
+  }
 }

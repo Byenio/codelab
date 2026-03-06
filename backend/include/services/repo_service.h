@@ -11,7 +11,7 @@ namespace codelab::services
   class RepoService
   {
   public:
-    RepoService();
+    explicit RepoService(std::string root_path = "../../data/repositories");
 
     std::optional<models::Repository> CreateRepository (
       int user_id,

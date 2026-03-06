@@ -39,6 +39,8 @@ namespace codelab::core
      */
     sqlite3* GetHandle() const;
 
+    void Disconnect();
+
   private:
     Database() = default;
     ~Database();

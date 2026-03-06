@@ -5,6 +5,7 @@
     "crow",
     "libgit2",
     "sqlite3",
-    "nlohmann-json"
+    "nlohmann-json",
+    "gtest"
   ]
 }
