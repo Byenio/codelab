@@ -66,6 +66,31 @@ namespace codelab::dao
     return std::nullopt;
   }
 
+  std::optional<models::Repository> RepositoryDAO::FindById(int id) {
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+    std::string sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash, is_private FROM repositories WHERE id = ?;";
+
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return std::nullopt;
+
+    sqlite3_bind_int(stmt, 1, id);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+      models::Repository r;
+      r.id = sqlite3_column_int(stmt, 0);
+      r.user_id = sqlite3_column_int(stmt, 1);
+      if (sqlite3_column_type(stmt, 2) != SQLITE_NULL) r.directory_id = sqlite3_column_int(stmt, 2);
+      r.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+      r.description = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+      r.disk_path_hash = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+      r.is_private = sqlite3_column_int(stmt, 6) != 0;
+      sqlite3_finalize(stmt);
+      return r;
+    }
+    sqlite3_finalize(stmt);
+    return std::nullopt;
+  }
+
   std::vector<models::Repository> RepositoryDAO::ListByDirectory(int user_id, std::optional<int> directory_id)
   {
     std::vector<models::Repository> results;

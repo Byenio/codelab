@@ -1,6 +1,7 @@
 #include "api/routes.h"
 #include "dao/repository_dao.h"
 #include "dao/directory_dao.h"
+#include "git/git_viewer.h"
 #include "services/repo_service.h"
 
 namespace codelab::api
@@ -9,7 +10,9 @@ namespace codelab::api
   {
     // --- DEBUG ROUTES ---
 
-    CROW_ROUTE(app, "/api/v1/health") ([]()
+    CROW_ROUTE(app, "/api/v1/health")
+    .methods(crow::HTTPMethod::GET)
+    ([]()
     {
       crow::json::wvalue res;
       res["status"] = "ok";
@@ -20,7 +23,7 @@ namespace codelab::api
     // --- DIRECTORY ROUTES ---
 
     // List contents of a folder
-    // GET /api/directories?parent_id=0
+    // GET /api/v1/directories?parent_id=0
     CROW_ROUTE(app, "/api/v1/directories")
     .methods(crow::HTTPMethod::GET)
     ([](const crow::request& req)
@@ -68,7 +71,7 @@ namespace codelab::api
     });
 
     // Create new folder
-    // POST /api/directories
+    // POST /api/v1/directories
     CROW_ROUTE(app, "/api/v1/directories")
     .methods(crow::HTTPMethod::POST)
     ([](const crow::request& req)
@@ -97,7 +100,7 @@ namespace codelab::api
     // --- REPOSITORY ROUTES ---
 
     // Create new repo
-    // POST /api/repositories
+    // POST /api/v1/repositories
     CROW_ROUTE(app, "/api/v1/repositories")
     .methods(crow::HTTPMethod::POST)
     ([](const crow::request& req)
@@ -123,6 +126,61 @@ namespace codelab::api
 
       if (result) return crow::response(201, "Repository created");
       return crow::response(500, "Failed to create repository");
+    });
+
+    // --- GIT READ ROUTES ---
+
+    // Get branches
+    // GET /api/v1/repositories/{id}/branches
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/branches")
+    .methods(crow::HTTPMethod::GET)
+    ([](int repo_id)
+    {
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404, "Repository not found");
+
+      std::string full_path = "../../data/repositories/" + repo->disk_path_hash + ".git";
+
+      git::GitViewer viewer(full_path);
+      auto branches = viewer.GetBranches();
+
+      crow::json::wvalue res = crow::json::wvalue::list();
+      for (size_t i = 0; i < branches.size(); i++)
+      {
+        res[i]["name"] = branches[i].name;
+        res[i]["sha"] = branches[i].latest_commit_hash;
+        res[i]["is_head"] = branches[i].is_head;
+      }
+      return crow::response(200, res);
+    });
+
+    // Get commits
+    // GET /api/v1/repositories/{id}/commits?branch=master
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/commits")
+    .methods(crow::HTTPMethod::GET)
+    ([](const crow::request& req, int repo_id)
+    {
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404, "Repository not found");
+
+      std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "HEAD";
+      std::string full_path = "../../data/repositories/" + repo->disk_path_hash + ".git";
+
+      git::GitViewer viewer(full_path);
+      auto commits = viewer.GetCommits(branch);
+
+      crow::json::wvalue res = crow::json::wvalue::list();
+      for (size_t i = 0; i < commits.size(); i++)
+      {
+        res[i]["hash"] = commits[i].hash;
+        res[i]["message"] = commits[i].message;
+        res[i]["author"] = commits[i].author_name;
+        res[i]["date"] = commits[i].timestamp;
+      }
+
+      return crow::response(200, res);
     });
   }
 }
