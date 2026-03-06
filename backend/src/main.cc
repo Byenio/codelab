@@ -1,6 +1,7 @@
 #include <crow.h>
 #include <git2.h>
 #include <iostream>
+#include <sodium.h>
 
 #include "api/routes.h"
 #include "core/config.h"
@@ -10,6 +11,12 @@
 int main(int argc, char** argv) {
   auto& config = codelab::core::Config::GetInstance();
   config.Load("../../.env");
+
+  if (sodium_init() < 0)
+  {
+    std::cerr << "[!] Failed to initialize libsodium" << std::endl;
+    return 1;
+  }
 
   git_libgit2_init();
 

@@ -8,6 +8,7 @@
     "nlohmann-json",
     "gtest",
     "jwt-cpp",
-    "cpr"
+    "cpr",
+    "libsodium"
   ]
 }

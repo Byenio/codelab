@@ -3,6 +3,7 @@
 #include <jwt-cpp/jwt.h>
 #include <jwt-cpp/traits/nlohmann-json/defaults.h>
 #include <chrono>
+#include <sodium.h>
 
 namespace codelab::services
 {
@@ -13,7 +14,10 @@ namespace codelab::services
     auto user = user_dao_.FindByUsername(username);
     if (!user) return std::nullopt;
 
-    if (user->password_hash != password) return std::nullopt;
+    if (crypto_pwhash_str_verify(user->password_hash.c_str(), password.c_str(), password.length()) != 0)
+    {
+      return std::nullopt;
+    }
 
     std::string secret = core::Config::GetInstance().GetString("JWT_SECRET");
 

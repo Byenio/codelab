@@ -18,6 +18,7 @@ target_link_libraries(codelab_lib PUBLIC
         unofficial::sqlite3::sqlite3
         libgit2::libgit2package
         jwt-cpp::jwt-cpp
+        unofficial-sodium::sodium
 )
 
 # --- SERVER EXECUTABLE ---
