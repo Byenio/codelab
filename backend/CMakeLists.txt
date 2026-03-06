@@ -17,6 +17,8 @@ target_link_libraries(codelab_lib PUBLIC
         nlohmann_json::nlohmann_json
         unofficial::sqlite3::sqlite3
         libgit2::libgit2package
+        jwt-cpp::jwt-cpp
+        unofficial-sodium::sodium
 )
 
 # --- SERVER EXECUTABLE ---
@@ -32,13 +34,15 @@ add_executable(codelab_tests
         tests/dao_tests.cc
         tests/git_tests.cc
         tests/service_tests.cc
+        tests/auth_tests.cc
+        tests/api_tests.cc
 )
 
 target_include_directories(codelab_tests PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(codelab_tests PRIVATE codelab_lib GTest::gtest)
+target_link_libraries(codelab_tests PRIVATE codelab_lib GTest::gtest cpr::cpr)
 
 include(GoogleTest)
 gtest_discover_tests(codelab_tests)

@@ -1,4 +1,6 @@
 #include "api/routes.h"
+
+#include "core/config.h"
 #include "dao/repository_dao.h"
 #include "dao/directory_dao.h"
 #include "git/git_viewer.h"
@@ -8,7 +10,9 @@ namespace codelab::api
 {
   void RegisterRoutes(crow::App<middleware::AuthMiddleware>& app)
   {
-    // --- DEBUG ROUTES ---
+    // region --- PUBLIC ROUTES ---
+
+    // region --- DEBUG ---
 
     CROW_ROUTE(app, "/api/v1/health")
     .methods(crow::HTTPMethod::GET)
@@ -20,16 +24,66 @@ namespace codelab::api
       return res;
     });
 
-    // --- DIRECTORY ROUTES ---
+    // endregion
+
+    // region --- LOGIN / REGISTER ---
+
+    // Register new user
+    // POST /api/v1/register
+    CROW_ROUTE(app, "/api/v1/register")
+    .methods(crow::HTTPMethod::POST)
+    ([](const crow::request& req)
+    {
+      auto data = crow::json::load(req.body);
+      if (!data || !data.has("username") || !data.has("password") || !data.has("email"))
+        return crow::response(400, "Invalid JSON");
+
+      dao::UserDAO user_dao;
+      auto user = user_dao.Create(data["username"].s(), data["password"].s(), data["email"].s());
+
+      if (user) return crow::response(201, "User registered");
+      return crow::response(500, "Registration failed");
+    });
+
+    // Login
+    // POST /api/v1/login
+    CROW_ROUTE(app, "/api/v1/login")
+    .methods(crow::HTTPMethod::POST)
+    ([](const crow::request& req)
+    {
+      auto data = crow::json::load(req.body);
+      if (!data || !data.has("username") || !data.has("password"))
+        return crow::response(400, "Invalid JSON");
+
+      services::AuthService auth;
+      auto token = auth.Login(data["username"].s(), data["password"].s());
+
+      if (token)
+      {
+        crow::json::wvalue res;
+        res["token"] = *token;
+        return crow::response(200, res);
+      }
+      return crow::response(401, "Invalid credentials");
+    });
+
+    // endregion
+
+    // endregion
+
+    // region --- PRIVATE ROUTES ---
+
+    // region --- DIRECTORY ---
 
     // List contents of a folder
     // GET /api/v1/directories?parent_id=0
     CROW_ROUTE(app, "/api/v1/directories")
     .methods(crow::HTTPMethod::GET)
-    ([](const crow::request& req)
+    ([&app](const crow::request& req)
     {
-      // TODO: get user_id from middleware context, once auth is built
-      int user_id = 1;
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+      int user_id = ctx.user_id;
 
       std::optional<int> parent_id = std::nullopt;
       if (req.url_params.get("parent_id"))
@@ -67,17 +121,18 @@ namespace codelab::api
         j++;
       }
 
-      return res;
+      return crow::response(200, res);
     });
 
     // Create new folder
     // POST /api/v1/directories
     CROW_ROUTE(app, "/api/v1/directories")
     .methods(crow::HTTPMethod::POST)
-    ([](const crow::request& req)
+    ([&app](const crow::request& req)
     {
-      // TODO: get user_id from middleware context, once auth is built
-      int user_id = 1;
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+      int user_id = ctx.user_id;
       auto data = crow::json::load(req.body);
 
       if (!data) return crow::response(400, "Invalid JSON");
@@ -97,16 +152,19 @@ namespace codelab::api
       return crow::response(500, "Failed to create directory");
     });
 
-    // --- REPOSITORY ROUTES ---
+    // endregion
+
+    // region --- REPOSITORY ---
 
     // Create new repo
     // POST /api/v1/repositories
     CROW_ROUTE(app, "/api/v1/repositories")
     .methods(crow::HTTPMethod::POST)
-    ([](const crow::request& req)
+    ([&app](const crow::request& req)
     {
-      // TODO: get user_id from middleware context, once auth is built
-      int user_id = 1;
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+      int user_id = ctx.user_id;
       auto data = crow::json::load(req.body);
 
       if (!data) return crow::response(400, "Invalid JSON");
@@ -128,19 +186,25 @@ namespace codelab::api
       return crow::response(500, "Failed to create repository");
     });
 
-    // --- GIT READ ROUTES ---
+    // endregion
+
+    // region --- GIT READ ---
 
     // Get branches
     // GET /api/v1/repositories/{id}/branches
     CROW_ROUTE(app, "/api/v1/repositories/<int>/branches")
     .methods(crow::HTTPMethod::GET)
-    ([](int repo_id)
+    ([&app](const crow::request& req, int repo_id)
     {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo) return crow::response(404, "Repository not found");
+      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
 
-      std::string full_path = "../../data/repositories/" + repo->disk_path_hash + ".git";
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
+      std::string full_path = storage_path + repo->disk_path_hash + ".git";
 
       git::GitViewer viewer(full_path);
       auto branches = viewer.GetBranches();
@@ -159,14 +223,18 @@ namespace codelab::api
     // GET /api/v1/repositories/{id}/commits?branch=master
     CROW_ROUTE(app, "/api/v1/repositories/<int>/commits")
     .methods(crow::HTTPMethod::GET)
-    ([](const crow::request& req, int repo_id)
+    ([&app](const crow::request& req, int repo_id)
     {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo) return crow::response(404, "Repository not found");
+      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
 
       std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "HEAD";
-      std::string full_path = "../../data/repositories/" + repo->disk_path_hash + ".git";
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
+      std::string full_path = storage_path + repo->disk_path_hash + ".git";
 
       git::GitViewer viewer(full_path);
       auto commits = viewer.GetCommits(branch);
@@ -182,5 +250,9 @@ namespace codelab::api
 
       return crow::response(200, res);
     });
+
+    // endregion
+
+    // endregion
   }
 }

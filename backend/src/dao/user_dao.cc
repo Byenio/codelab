@@ -1,6 +1,7 @@
 #include "dao/user_dao.h"
 #include "core/db.h"
 #include <iostream>
+#include <sodium.h>
 
 namespace codelab::dao
 {
@@ -10,6 +11,17 @@ namespace codelab::dao
     sqlite3* handle = db.GetHandle();
     sqlite3_stmt* stmt;
 
+    char hashed_pwd[crypto_pwhash_STRBYTES];
+    if (crypto_pwhash_str(hashed_pwd,
+      password.c_str(),
+      password.length(),
+      crypto_pwhash_OPSLIMIT_INTERACTIVE,
+      crypto_pwhash_MEMLIMIT_INTERACTIVE) != 0)
+    {
+      std::cerr << "[!] Out of memory for password hashing" << std::endl;
+      return std::nullopt;
+    }
+
     std::string sql = "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?);";
 
     if (sqlite3_prepare_v2(handle, sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
@@ -18,9 +30,8 @@ namespace codelab::dao
       return std::nullopt;
     }
 
-    // TODO: Hash password before storing
     sqlite3_bind_text(stmt, 1, username.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, password.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, hashed_pwd, -1, SQLITE_STATIC);
     sqlite3_bind_text(stmt, 3, email.c_str(), -1, SQLITE_STATIC);
 
     if (sqlite3_step(stmt) != SQLITE_DONE)
@@ -30,10 +41,14 @@ namespace codelab::dao
       return std::nullopt;
     }
 
-    int id = (int)sqlite3_last_insert_rowid(handle);
-    sqlite3_finalize(stmt);
+    models::User user;
+    user.id = static_cast<int>(sqlite3_last_insert_rowid(db.GetHandle()));
+    user.username = username;
+    user.password_hash = hashed_pwd;
+    user.email = email;
 
-    return models::User(id, username, password, email);
+    sqlite3_finalize(stmt);
+    return user;
   }
 
   std::optional<models::User> UserDAO::FindByUsername(const std::string &username)
