@@ -6,6 +6,7 @@
     "libgit2",
     "sqlite3",
     "nlohmann-json",
-    "gtest"
+    "gtest",
+    "jwt-cpp"
   ]
 }

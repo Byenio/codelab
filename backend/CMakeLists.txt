@@ -17,6 +17,7 @@ target_link_libraries(codelab_lib PUBLIC
         nlohmann_json::nlohmann_json
         unofficial::sqlite3::sqlite3
         libgit2::libgit2package
+        jwt-cpp::jwt-cpp
 )
 
 # --- SERVER EXECUTABLE ---
