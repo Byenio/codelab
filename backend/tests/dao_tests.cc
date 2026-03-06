@@ -3,7 +3,6 @@
 #include "dao/user_dao.h"
 #include "dao/directory_dao.h"
 
-// Inherit from DBTest to get fresh DB every time
 class DaoTest : public DBTest {};
 
 TEST_F(DaoTest, CreateUser) {
@@ -16,18 +15,15 @@ TEST_F(DaoTest, CreateUser) {
 }
 
 TEST_F(DaoTest, CreateDirectory) {
-  // 1. Setup User
   codelab::dao::UserDAO userDao;
   auto user = userDao.Create("u", "p", "e");
   ASSERT_TRUE(user.has_value());
 
-  // 2. Test Directory
   codelab::dao::DirectoryDAO dirDao;
   auto dirId = dirDao.Create(user->id, std::nullopt, "RootFolder");
 
   ASSERT_TRUE(dirId.has_value());
 
-  // 3. Verify
   auto dirs = dirDao.ListByParent(user->id, std::nullopt);
   ASSERT_EQ(dirs.size(), 1);
   EXPECT_EQ(dirs[0].name, "RootFolder");

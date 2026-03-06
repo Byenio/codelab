@@ -30,6 +30,8 @@ find_package(GTest CONFIG REQUIRED)
 add_executable(codelab_tests
         tests/test_main.cc
         tests/dao_tests.cc
+        tests/git_tests.cc
+        tests/service_tests.cc
 )
 
 target_include_directories(codelab_tests PRIVATE

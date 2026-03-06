@@ -13,8 +13,5 @@ protected:
     db.ApplySchema("db/schema.sql");
   }
 
-  void TearDown() override {
-    // Close/Reset would happen here, but Singleton makes it tricky.
-    // For v1.0, just letting it overwrite the file next time is okay.
-  }
+  void TearDown() override {}
 };
