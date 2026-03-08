@@ -55,7 +55,7 @@ namespace codelab::api
       if (!data || !data.has("username") || !data.has("password"))
         return crow::response(400, "Invalid JSON");
 
-      services::AuthService auth;
+      services::AuthService auth{};
       auto token = auth.Login(data["username"].s(), data["password"].s());
 
       if (token)

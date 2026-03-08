@@ -120,4 +120,109 @@ namespace codelab::git
     git_revwalk_free(walker);
     return commits;
   }
+
+  std::vector<TreeEntry> GitViewer::GetTree(const std::string &ref, const std::string &path)
+  {
+    std::vector<TreeEntry> entries;
+    if (!Open()) return entries;
+
+    git_object* obj = nullptr;
+    if (git_revparse_single(&obj, repo_, ref.c_str()) != 0) return entries;
+
+    git_commit* commit = nullptr;
+    if (git_object_peel(reinterpret_cast<git_object **>(&commit), obj, GIT_OBJECT_COMMIT) != 0)
+    {
+      git_object_free(obj);
+      return entries;
+    }
+
+    git_tree* root_tree = nullptr;
+    git_commit_tree(&root_tree, commit);
+
+    git_tree* target_tree = nullptr;
+
+    if (path.empty() || path == "/")
+    {
+      target_tree = root_tree;
+    } else
+    {
+      git_tree_entry* entry = nullptr;
+      if (git_tree_entry_bypath(&entry, root_tree, path.c_str()) == 0)
+      {
+        if (git_tree_entry_type(entry) == GIT_OBJECT_TREE)
+        {
+          git_tree_lookup(&target_tree, repo_, git_tree_entry_id(entry));
+        }
+        git_tree_entry_free(entry);
+      }
+    }
+
+    if (target_tree)
+    {
+      size_t count = git_tree_entrycount(target_tree);
+      for (size_t i = 0; i < count; i++)
+      {
+        const git_tree_entry* entry = git_tree_entry_byindex(target_tree, i);
+        TreeEntry te;
+        te.name = git_tree_entry_name(entry);
+        te.type = (git_tree_entry_type(entry) == GIT_OBJECT_TREE) ? "tree" : "blob";
+
+        char oid_str[GIT_OID_HEXSZ + 1];
+        git_oid_tostr(oid_str, sizeof(oid_str), git_tree_entry_id(entry));
+        te.oid = oid_str;
+
+        entries.push_back(te);
+      }
+      if (target_tree != root_tree) git_tree_free(target_tree);
+    }
+
+    git_tree_free(root_tree);
+    git_commit_free(commit);
+    git_object_free(obj);
+
+    return entries;
+  }
+
+  std::optional<std::string> GitViewer::GetBlob(const std::string &ref, const std::string &path)
+  {
+    if (!Open()) return std::nullopt;
+
+    git_object* obj = nullptr;
+    if (git_revparse_single(&obj, repo_, ref.c_str()) != 0) return std::nullopt;
+
+    git_commit* commit = nullptr;
+    if (git_object_peel(reinterpret_cast<git_object **>(&commit), obj, GIT_OBJECT_COMMIT) != 0)
+    {
+      git_object_free(obj);
+      return std::nullopt;
+    }
+
+    git_tree* tree = nullptr;
+    git_commit_tree(&tree, commit);
+
+    git_tree_entry* entry = nullptr;
+    std::optional<std::string> content = std::nullopt;
+
+    if (git_tree_entry_bypath(&entry, tree, path.c_str()) == 0)
+    {
+      if (git_tree_entry_type(entry) == GIT_OBJECT_BLOB)
+      {
+        git_blob* blob = nullptr;
+        if (git_blob_lookup(&blob, repo_, git_tree_entry_id(entry)) == 0)
+        {
+          const char* raw = static_cast<const char*>(git_blob_rawcontent(blob));
+          size_t size = git_blob_rawsize(blob);
+          content = std::string(raw, size);
+          git_blob_free(blob);
+        }
+      }
+      git_tree_entry_free(entry);
+    }
+
+    git_tree_free(tree);
+    git_commit_free(commit);
+    git_object_free(obj);
+
+    return content;
+  }
 }
