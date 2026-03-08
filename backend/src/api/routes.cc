@@ -172,17 +172,24 @@ namespace codelab::api
       std::string name= data["name"].s();
       std::string description= data.has("description") ? data["description"].s() : static_cast<std::string>("");
       bool is_private = data["is_private"].b();
-      std::optional<int> dir_id;
+      bool init_readme = data.has("init_readme") ? data["init_readme"].b() : false;
 
+      std::optional<int> dir_id;
       if (data.has("directory_id") && data["directory_id"].t() == crow::json::type::Number)
       {
         dir_id = static_cast<int>(data["directory_id"].i());
       }
 
       services::RepoService repo_service;
-      auto result = repo_service.CreateRepository(user_id, dir_id, name, description, is_private);
+      auto result = repo_service.CreateRepository(user_id, dir_id, name, description, is_private, init_readme);
 
-      if (result) return crow::response(201, "Repository created");
+      if (result)
+      {
+        crow::json::wvalue res;
+        res["id"] = result->id;
+        res["message"] = "Repository created";
+        return crow::response(201, res);
+      }
       return crow::response(500, "Failed to create repository");
     });
 

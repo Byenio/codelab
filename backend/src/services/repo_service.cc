@@ -22,7 +22,7 @@ namespace codelab::services
     return ss.str();
   }
 
-  std::optional<models::Repository> RepoService::CreateRepository(int user_id, std::optional<int> parent_id, const std::string &name, const std::string &description, bool is_private)
+  std::optional<models::Repository> RepoService::CreateRepository(int user_id, std::optional<int> parent_id, const std::string &name, const std::string &description, bool is_private, bool init_readme)
   {
     if (parent_id.has_value())
     {
@@ -44,7 +44,7 @@ namespace codelab::services
     repo.is_private = is_private;
     repo.disk_path_hash = GenerateDiskHash();
 
-    if (!storage_.InitRepo(repo.disk_path_hash))
+    if (!storage_.InitRepo(repo.disk_path_hash, name, init_readme))
     {
       return std::nullopt;
     }
