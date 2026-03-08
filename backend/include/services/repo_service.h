@@ -18,7 +18,8 @@ namespace codelab::services
       std::optional<int> parent_id,
       const std::string& name,
       const std::string& description,
-      bool is_private
+      bool is_private,
+      bool init_readme = false
     );
 
   private:

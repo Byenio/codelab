@@ -12,7 +12,7 @@ namespace codelab::git
   public:
     explicit GitStorage(std::string root_path) : root_path_(std::move(root_path)) {};
 
-    bool InitRepo(const std::string& disk_path_hash);
+    bool InitRepo(const std::string& disk_path_hash, const std::string& repo_name, bool with_readme = false);
     bool DeleteRepo(const std::string& disk_path_hash);
     bool Exists(const std::string& disk_path_hash);
 

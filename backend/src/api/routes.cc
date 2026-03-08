@@ -55,7 +55,7 @@ namespace codelab::api
       if (!data || !data.has("username") || !data.has("password"))
         return crow::response(400, "Invalid JSON");
 
-      services::AuthService auth;
+      services::AuthService auth{};
       auto token = auth.Login(data["username"].s(), data["password"].s());
 
       if (token)
@@ -172,23 +172,30 @@ namespace codelab::api
       std::string name= data["name"].s();
       std::string description= data.has("description") ? data["description"].s() : static_cast<std::string>("");
       bool is_private = data["is_private"].b();
-      std::optional<int> dir_id;
+      bool init_readme = data.has("init_readme") ? data["init_readme"].b() : false;
 
+      std::optional<int> dir_id;
       if (data.has("directory_id") && data["directory_id"].t() == crow::json::type::Number)
       {
         dir_id = static_cast<int>(data["directory_id"].i());
       }
 
       services::RepoService repo_service;
-      auto result = repo_service.CreateRepository(user_id, dir_id, name, description, is_private);
+      auto result = repo_service.CreateRepository(user_id, dir_id, name, description, is_private, init_readme);
 
-      if (result) return crow::response(201, "Repository created");
+      if (result)
+      {
+        crow::json::wvalue res;
+        res["id"] = result->id;
+        res["message"] = "Repository created";
+        return crow::response(201, res);
+      }
       return crow::response(500, "Failed to create repository");
     });
 
     // endregion
 
-    // region --- GIT READ ---
+    // region --- GIT OPERATIONS ---
 
     // Get branches
     // GET /api/v1/repositories/{id}/branches
@@ -248,6 +255,68 @@ namespace codelab::api
         res[i]["date"] = commits[i].timestamp;
       }
 
+      return crow::response(200, res);
+    });
+
+    // Get tree
+    // GET /api/v1/repositories/{id}/tree
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/tree")
+    .methods(crow::HTTPMethod::GET)
+    ([&app](const crow::request& req, int repo_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+
+      std::string ref = req.url_params.get("ref") ? req.url_params.get("ref") : "HEAD";
+      std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
+      std::string full_path = storage_path + repo->disk_path_hash + ".git";
+
+      git::GitViewer viewer(full_path);
+      auto tree = viewer.GetTree(ref, path);
+
+      crow::json::wvalue res = crow::json::wvalue::list();
+      for (size_t i = 0; i < tree.size(); i++)
+      {
+        res[i]["name"] = tree[i].name;
+        res[i]["type"] = tree[i].type;
+        res[i]["oid"] = tree[i].oid;
+      }
+      return crow::response(200, res);
+    });
+
+    // Get blob
+    // GET /api/v1/repositories/{id}/blob
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/blob")
+    .methods(crow::HTTPMethod::GET)
+    ([&app](const crow::request& req, int repo_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+
+      std::string ref = req.url_params.get("ref") ? req.url_params.get("ref") : "HEAD";
+      std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
+
+      if (path.empty()) return crow::response(400, "Path is required for blob");
+
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
+      std::string full_path = storage_path + repo->disk_path_hash + ".git";
+
+      git::GitViewer viewer(full_path);
+      auto content = viewer.GetBlob(ref, path);
+
+      if (!content) return crow::response(404, "File not found in this commit");
+
+      crow::json::wvalue res;
+      res["content"] = *content;
       return crow::response(200, res);
     });
 

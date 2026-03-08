@@ -9,6 +9,13 @@
 
 namespace codelab::git
 {
+  struct TreeEntry
+  {
+    std::string name;
+    std::string type; // blob - file; tree - folder
+    std::string oid;
+  };
+
   class GitViewer
   {
   public:
@@ -17,6 +24,9 @@ namespace codelab::git
 
     std::vector<models::Branch> GetBranches();
     std::vector<models::Commit> GetCommits(const std::string& branch_name = "HEAD", int limit = 10);
+
+    std::vector<TreeEntry> GetTree(const std::string& ref, const std::string& path = "");
+    std::optional<std::string> GetBlob(const std::string& ref, const std::string& path);
 
   private:
     std::string path_;
