@@ -9,6 +9,7 @@
     "gtest",
     "jwt-cpp",
     "cpr",
-    "libsodium"
+    "libsodium",
+    "reproc"
   ]
 }

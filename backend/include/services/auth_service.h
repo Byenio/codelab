@@ -13,6 +13,7 @@ namespace codelab::services
   public:
     std::optional<std::string> Login(const std::string& username, const std::string& password);
     std::optional<int> VerifyToken(const std::string& token);
+    std::optional<int> VerifyBasicAuth(const std::string& auth_header);
 
   private:
     dao::UserDAO user_dao_;

@@ -1,10 +1,10 @@
 #include "api/routes.h"
-
 #include "core/config.h"
 #include "dao/repository_dao.h"
 #include "dao/directory_dao.h"
 #include "git/git_viewer.h"
 #include "services/repo_service.h"
+#include "services/git_http_service.h"
 
 namespace codelab::api
 {
@@ -203,12 +203,20 @@ namespace codelab::api
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, int repo_id)
     {
-      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
-
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+      if (!repo) return crow::response(404, "Repository not found");
+
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0)
+      {
+        // TODO: allow collaborators
+        if (repo->user_id == ctx.user_id) authorized = true;
+      }
+
+      if (!authorized) return crow::response(404, "Repository not found");
 
       std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
       std::string full_path = storage_path + repo->disk_path_hash + ".git";
@@ -232,12 +240,20 @@ namespace codelab::api
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, int repo_id)
     {
-      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
-
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+      if (!repo) return crow::response(404, "Repository not found");
+
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0)
+      {
+        // TODO: allow collaborators
+        if (repo->user_id == ctx.user_id) authorized = true;
+      }
+
+      if (!authorized) return crow::response(404, "Repository not found");
 
       std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "HEAD";
       std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
@@ -264,12 +280,20 @@ namespace codelab::api
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, int repo_id)
     {
-      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
-
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+      if (!repo) return crow::response(404, "Repository not found");
+
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0)
+      {
+        // TODO: allow collaborators
+        if (repo->user_id == ctx.user_id) authorized = true;
+      }
+
+      if (!authorized) return crow::response(404, "Repository not found");
 
       std::string ref = req.url_params.get("ref") ? req.url_params.get("ref") : "HEAD";
       std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
@@ -295,12 +319,20 @@ namespace codelab::api
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, int repo_id)
     {
-      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
-
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+      if (!repo) return crow::response(404, "Repository not found");
+
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0)
+      {
+        // TODO: allow collaborators
+        if (repo->user_id == ctx.user_id) authorized = true;
+      }
+
+      if (!authorized) return crow::response(404, "Repository not found");
 
       std::string ref = req.url_params.get("ref") ? req.url_params.get("ref") : "HEAD";
       std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
@@ -318,6 +350,118 @@ namespace codelab::api
       crow::json::wvalue res;
       res["content"] = *content;
       return crow::response(200, res);
+    });
+
+    // endregion
+
+    // region --- GIT SMART HTTP ---
+
+    // Handshake
+    // GET /git/{repo_id}.git/info/refs?service=git-upload-pack
+    CROW_ROUTE(app, "/git/<int>.git/info/refs")
+    .methods(crow::HTTPMethod::GET)
+    ([](const crow::request& req, int repo_id){
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404);
+
+      std::string service = req.url_params.get("service");
+      if (service.empty()) return crow::response(400, "Service required");
+
+      bool is_read_op = (service == "git-upload-pack");
+      bool is_write_op = (service == "git-receive-pack");
+
+      int user_id = 0;
+      std::string auth_header = req.get_header_value("Authorization");
+      services::AuthService auth {};
+
+      auto auth_result = auth.VerifyBasicAuth(auth_header);
+      if (auth_result) user_id = *auth_result;
+
+      bool authorized = false;
+
+      if (is_read_op)
+      {
+        if ((!repo->is_private) || (user_id != 0 && repo->user_id == user_id)) authorized = true;
+      } else if (is_write_op)
+      {
+        // TODO: allow collaborators
+        if (user_id != 0 && repo->user_id == user_id) authorized = true;
+      }
+
+      if (!authorized) {
+        crow::response res(401);
+        res.set_header("WWW-Authenticate", "Basic realm=\"Codelab git\"");
+        return res;
+      }
+
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
+      std::string full_path = storage_path + repo->disk_path_hash + ".git";
+
+      services::GitHttpService git_service;
+      auto output = git_service.GetInfoRefs(full_path, service);
+
+      if (!output) return crow::response(500, "Git error");
+
+      crow::response res(*output);
+      res.set_header("Content-Type", "application/x-" + service + "-advertisement");
+      res.set_header("Cache-Control", "no-cache");
+      return res;
+    });
+
+    // Data transfer
+    // POST /git/{repo_id}.git/git-upload-pack
+    // POST /git/{repo_id}.git/git-receive-pack
+    CROW_ROUTE(app, "/git/<int>.git/<string>")
+    .methods(crow::HTTPMethod::POST)
+    ([](const crow::request& req, int repo_id, const std::string& service){
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404);
+
+      if (service != "git-upload-pack" && service != "git-receive-pack")
+      {
+        return crow::response(400, "Invalid service");
+      }
+
+      bool is_read_op = (service == "git-upload-pack");
+      bool is_write_op = (service == "git-receive-pack");
+
+      int user_id = 0;
+      std::string auth_header = req.get_header_value("Authorization");
+      services::AuthService auth {};
+      auto auth_result = auth.VerifyBasicAuth(auth_header);
+      if (auth_result) user_id = *auth_result;
+
+      bool authorized = false;
+
+      if (is_read_op)
+      {
+        if ((!repo->is_private) || (user_id != 0 && repo->user_id == user_id)) authorized = true;
+      } else if (is_write_op)
+      {
+        // TODO: allow collaborators
+        if (user_id != 0 && repo->user_id == user_id) authorized = true;
+      }
+
+      if (!authorized) {
+        crow::response res(401);
+        res.set_header("WWW-Authenticate", "Basic realm=\"Codelab git\"");
+        return res;
+      }
+
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
+      std::string full_path = storage_path + repo->disk_path_hash + ".git";
+
+      services::GitHttpService git_service;
+      auto output = git_service.HandleRpc(full_path, service, req.body);
+
+      if (!output) return crow::response(500, "Git error");
+
+      crow::response res(*output);
+      res.set_header("Content-Type", "application/x-" + service + "-result");
+      res.set_header("Cache-Control", "no-cache");
+      return res;
     });
 
     // endregion
