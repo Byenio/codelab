@@ -4,6 +4,7 @@
 #include <jwt-cpp/traits/nlohmann-json/defaults.h>
 #include <chrono>
 #include <sodium.h>
+#include <crow/utility.h>
 
 namespace codelab::services
 {
@@ -51,5 +52,29 @@ namespace codelab::services
     {
       return std::nullopt;
     }
+  }
+
+  std::optional<int> AuthService::VerifyBasicAuth(const std::string &auth_header)
+  {
+    if (auth_header.substr(0, 6) != "Basic ") return std::nullopt;
+
+    std::string encoded = auth_header.substr(6);
+    std::string decoded = crow::utility::base64decode(encoded, encoded.size());
+
+    auto colon_pos = decoded.find(':');
+    if (colon_pos == std::string::npos) return std::nullopt;
+
+    std::string username = decoded.substr(0, colon_pos);
+    std::string password = decoded.substr(colon_pos + 1);
+
+    auto user = user_dao_.FindByUsername(username);
+    if (!user) return std::nullopt;
+
+    if (crypto_pwhash_str_verify(user->password_hash.c_str(), password.c_str(), password.length()) != 0)
+    {
+      return std::nullopt;
+    }
+
+    return user->id;
   }
 }
