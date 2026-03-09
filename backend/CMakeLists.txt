@@ -37,6 +37,7 @@ add_executable(codelab_tests
         tests/service_tests.cc
         tests/auth_tests.cc
         tests/api_tests.cc
+        tests/git_http_tests.cc
 )
 
 target_include_directories(codelab_tests PRIVATE

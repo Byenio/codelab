@@ -6,9 +6,17 @@
 
 namespace codelab::services
 {
+  std::string GetGitSubcommand(const std::string& service) {
+    if (service.rfind("git-", 0) == 0) {
+      return service.substr(4);
+    }
+    return service;
+  }
+
   std::optional<std::string> GitHttpService::GetInfoRefs(const std::string &repo_path, const std::string &service)
   {
-    std::vector<std::string> args = {"git", service, "--stateless-rpc", "--advertise-refs", repo_path};
+    std::string subcommand = GetGitSubcommand(service);
+    std::vector<std::string> args = {"git", subcommand, "--stateless-rpc", "--advertise-refs", repo_path};
     auto output = ExecuteGitCommand(args);
 
     if (!output) return std::nullopt;
@@ -29,7 +37,8 @@ namespace codelab::services
 
   std::optional<std::string> GitHttpService::HandleRpc(const std::string &repo_path, const std::string &service, const std::string &input_data)
   {
-    std::vector<std::string> args = {"git", service, "--stateless-rpc", repo_path};
+    std::string subcommand = GetGitSubcommand(service);
+    std::vector<std::string> args = {"git", subcommand, "--stateless-rpc", repo_path};
     return ExecuteGitCommand(args, input_data);
   }
 
