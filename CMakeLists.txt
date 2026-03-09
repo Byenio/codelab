@@ -11,5 +11,6 @@ find_package(libgit2 CONFIG REQUIRED)
 find_package(jwt-cpp CONFIG REQUIRED)
 find_package(cpr CONFIG REQUIRED)
 find_package(unofficial-sodium CONFIG REQUIRED)
+find_package(reproc++ CONFIG REQUIRED)
 
 add_subdirectory(backend)

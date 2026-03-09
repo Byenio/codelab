@@ -19,6 +19,7 @@ target_link_libraries(codelab_lib PUBLIC
         libgit2::libgit2package
         jwt-cpp::jwt-cpp
         unofficial-sodium::sodium
+        reproc++
 )
 
 # --- SERVER EXECUTABLE ---
