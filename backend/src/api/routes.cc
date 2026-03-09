@@ -203,12 +203,20 @@ namespace codelab::api
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, int repo_id)
     {
-      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
-
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+      if (!repo) return crow::response(404, "Repository not found");
+
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0)
+      {
+        // TODO: allow collaborators
+        if (repo->user_id == ctx.user_id) authorized = true;
+      }
+
+      if (!authorized) return crow::response(404, "Repository not found");
 
       std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
       std::string full_path = storage_path + repo->disk_path_hash + ".git";
@@ -232,12 +240,20 @@ namespace codelab::api
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, int repo_id)
     {
-      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
-
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+      if (!repo) return crow::response(404, "Repository not found");
+
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0)
+      {
+        // TODO: allow collaborators
+        if (repo->user_id == ctx.user_id) authorized = true;
+      }
+
+      if (!authorized) return crow::response(404, "Repository not found");
 
       std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "HEAD";
       std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
@@ -264,12 +280,20 @@ namespace codelab::api
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, int repo_id)
     {
-      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
-
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+      if (!repo) return crow::response(404, "Repository not found");
+
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0)
+      {
+        // TODO: allow collaborators
+        if (repo->user_id == ctx.user_id) authorized = true;
+      }
+
+      if (!authorized) return crow::response(404, "Repository not found");
 
       std::string ref = req.url_params.get("ref") ? req.url_params.get("ref") : "HEAD";
       std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
@@ -295,12 +319,20 @@ namespace codelab::api
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, int repo_id)
     {
-      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
-
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
-      if (!repo || repo->user_id != ctx.user_id) return crow::response(404, "Repository not found");
+      if (!repo) return crow::response(404, "Repository not found");
+
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0)
+      {
+        // TODO: allow collaborators
+        if (repo->user_id == ctx.user_id) authorized = true;
+      }
+
+      if (!authorized) return crow::response(404, "Repository not found");
 
       std::string ref = req.url_params.get("ref") ? req.url_params.get("ref") : "HEAD";
       std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
@@ -353,7 +385,7 @@ namespace codelab::api
         if ((!repo->is_private) || (user_id != 0 && repo->user_id == user_id)) authorized = true;
       } else if (is_write_op)
       {
-        // TODO: allow collaborators to write
+        // TODO: allow collaborators
         if (user_id != 0 && repo->user_id == user_id) authorized = true;
       }
 
@@ -382,7 +414,7 @@ namespace codelab::api
     // POST /git/{repo_id}.git/git-receive-pack
     CROW_ROUTE(app, "/git/<int>.git/<string>")
     .methods(crow::HTTPMethod::POST)
-    ([](const crow::request& req, int repo_id, std::string service){
+    ([](const crow::request& req, int repo_id, const std::string& service){
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
       if (!repo) return crow::response(404);
@@ -408,7 +440,7 @@ namespace codelab::api
         if ((!repo->is_private) || (user_id != 0 && repo->user_id == user_id)) authorized = true;
       } else if (is_write_op)
       {
-        // TODO: allow collaborators to write
+        // TODO: allow collaborators
         if (user_id != 0 && repo->user_id == user_id) authorized = true;
       }
 
