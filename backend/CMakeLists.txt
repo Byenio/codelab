@@ -51,3 +51,8 @@ gtest_discover_tests(codelab_tests)
 
 file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/db/schema.sql
         DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/db)
+
+# --- SSH SHELL ---
+add_executable(codelab_shell src/shell/main.cc)
+
+target_link_libraries(codelab_shell PRIVATE codelab_lib)
