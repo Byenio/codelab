@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  codelab:
+    build: .
+    container_name: codelab_server
+    ports:
+      - "8080:8080"
+      - "2222:22"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - REPO_STORAGE_PATH=/app/data/repositories
+      - DB_PATH=/app/data/db/codelab.db
+      - DB_SCHEMA_PATH=/app/db/schema.sql
+    restart: unless-stopped

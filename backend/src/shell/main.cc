@@ -1,7 +1,8 @@
 #include <iostream>
-#include <process.h>
 #include <string>
 #include <vector>
+#include <sstream>
+#include <cstdlib>
 
 #include "core/config.h"
 #include "dao/repository_dao.h"
@@ -12,8 +13,21 @@ int main() {
   return 1;
 }
 #else
+#include <unistd.h>
 
-std::vector<std::string> Split(const std::string& std, char delimiter);
+std::vector<std::string> Split(const std::string& str, char delimiter)
+{
+  std::vector<std::string> tokens;
+  std::string token;
+  std::istringstream tokenStream(str);
+
+  while (std::getline(tokenStream, token, delimiter))
+  {
+    tokens.push_back(token);
+  }
+
+  return tokens;
+}
 
 int main(int argc, char* argv[])
 {
@@ -81,7 +95,7 @@ int main(int argc, char* argv[])
     return 1;
   }
 
-  std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories/");
+  std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "/app/data/repositories/");
   std::string full_path = storage_path + repo->disk_path_hash + ".git";
 
   std::vector<std::string> arg_strings;

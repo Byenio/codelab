@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <optional>
 
 #include "git_storage.h"
 #include "models/git.h"
