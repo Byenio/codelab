@@ -76,4 +76,35 @@ namespace codelab::dao
     sqlite3_finalize(stmt);
     return results;
   }
+
+  std::optional<models::Directory> DirectoryDAO::FindById(int id)
+  {
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+
+    std::string sql = "SELECT id, user_id, parent_id, name FROM directories WHERE id = ?;";
+
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return std::nullopt;
+
+    sqlite3_bind_int(stmt, 1, id);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+      models::Directory dir;
+      dir.id = sqlite3_column_int(stmt, 0);
+      dir.user_id = sqlite3_column_int(stmt, 1);
+
+      if (sqlite3_column_type(stmt, 2) != SQLITE_NULL)
+      {
+        dir.parent_id = sqlite3_column_int(stmt, 2);
+      }
+      dir.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+
+      sqlite3_finalize(stmt);
+      return dir;
+    }
+
+    sqlite3_finalize(stmt);
+    return std::nullopt;
+  }
 }

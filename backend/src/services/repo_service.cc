@@ -26,7 +26,13 @@ namespace codelab::services
   {
     if (parent_id.has_value())
     {
-      // TODO: if parent_id is provided, does it exist and belong to user
+      auto directory = dir_dao_.FindById(*parent_id);
+
+      if (!directory || directory->user_id != user_id)
+      {
+        std::cerr << "[!] Directory not found" << std::endl;
+        return std::nullopt;
+      }
     }
 
     auto existing = repo_dao_.FindByName(user_id, parent_id, name);

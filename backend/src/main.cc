@@ -10,7 +10,7 @@
 
 int main(int argc, char** argv) {
   auto& config = codelab::core::Config::GetInstance();
-  config.Load("../../.env");
+  config.Load(".env");
 
   if (sodium_init() < 0)
   {
@@ -18,14 +18,19 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  git_libgit2_init();
+  if (git_libgit2_init() < 0)
+  {
+    std::cerr << "[!] Failed to initialize libgit2" << std::endl;
+    return 1;
+  }
 
   try
   {
     auto& db = codelab::core::Database::GetInstance();
     std::string db_path = config.GetString("DB_PATH", "../../data/codelab.db");
     db.Connect(db_path);
-    db.ApplySchema("db/schema.sql");
+    std::string db_schema_path = config.GetString("DB_SCHEMA_PATH", "db/schema.sql");
+    db.ApplySchema(db_schema_path);
   } catch (const std::exception& e)
   {
     std::cerr << "[!] Database error: " << e.what() << std::endl;

@@ -12,6 +12,7 @@ namespace codelab::dao
     std::optional<int> Create(int user_id, std::optional<int> parent_id, const std::string& name);
 
     std::vector<models::Directory> ListByParent(int user_id, std::optional<int> parent_id);
+    std::optional<models::Directory> FindById(int id);
   };
 }
 
