@@ -2,9 +2,11 @@
 #include "core/config.h"
 #include "dao/repository_dao.h"
 #include "dao/directory_dao.h"
+#include "dao/ssh_key_dao.h"
 #include "git/git_viewer.h"
 #include "services/repo_service.h"
 #include "services/git_http_service.h"
+#include "services/ssh_service.h"
 
 namespace codelab::api
 {
@@ -15,7 +17,7 @@ namespace codelab::api
     // region --- DEBUG ---
 
     CROW_ROUTE(app, "/api/v1/health")
-    .methods(crow::HTTPMethod::GET)
+    .methods(crow::HTTPMethod::Get)
     ([]()
     {
       crow::json::wvalue res;
@@ -29,9 +31,9 @@ namespace codelab::api
     // region --- LOGIN / REGISTER ---
 
     // Register new user
-    // POST /api/v1/register
+    // Post /api/v1/register
     CROW_ROUTE(app, "/api/v1/register")
-    .methods(crow::HTTPMethod::POST)
+    .methods(crow::HTTPMethod::Post)
     ([](const crow::request& req)
     {
       auto data = crow::json::load(req.body);
@@ -46,9 +48,9 @@ namespace codelab::api
     });
 
     // Login
-    // POST /api/v1/login
+    // Post /api/v1/login
     CROW_ROUTE(app, "/api/v1/login")
-    .methods(crow::HTTPMethod::POST)
+    .methods(crow::HTTPMethod::Post)
     ([](const crow::request& req)
     {
       auto data = crow::json::load(req.body);
@@ -76,9 +78,9 @@ namespace codelab::api
     // region --- DIRECTORY ---
 
     // List contents of a folder
-    // GET /api/v1/directories?parent_id=0
+    // Get /api/v1/directories?parent_id=0
     CROW_ROUTE(app, "/api/v1/directories")
-    .methods(crow::HTTPMethod::GET)
+    .methods(crow::HTTPMethod::Get)
     ([&app](const crow::request& req)
     {
       auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
@@ -125,9 +127,9 @@ namespace codelab::api
     });
 
     // Create new folder
-    // POST /api/v1/directories
+    // Post /api/v1/directories
     CROW_ROUTE(app, "/api/v1/directories")
-    .methods(crow::HTTPMethod::POST)
+    .methods(crow::HTTPMethod::Post)
     ([&app](const crow::request& req)
     {
       auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
@@ -157,9 +159,9 @@ namespace codelab::api
     // region --- REPOSITORY ---
 
     // Create new repo
-    // POST /api/v1/repositories
+    // Post /api/v1/repositories
     CROW_ROUTE(app, "/api/v1/repositories")
-    .methods(crow::HTTPMethod::POST)
+    .methods(crow::HTTPMethod::Post)
     ([&app](const crow::request& req)
     {
       auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
@@ -198,9 +200,9 @@ namespace codelab::api
     // region --- GIT OPERATIONS ---
 
     // Get branches
-    // GET /api/v1/repositories/{id}/branches
+    // Get /api/v1/repositories/{id}/branches
     CROW_ROUTE(app, "/api/v1/repositories/<int>/branches")
-    .methods(crow::HTTPMethod::GET)
+    .methods(crow::HTTPMethod::Get)
     ([&app](const crow::request& req, int repo_id)
     {
       dao::RepositoryDAO repo_dao;
@@ -235,9 +237,9 @@ namespace codelab::api
     });
 
     // Get commits
-    // GET /api/v1/repositories/{id}/commits?branch=master
+    // Get /api/v1/repositories/{id}/commits?branch=master
     CROW_ROUTE(app, "/api/v1/repositories/<int>/commits")
-    .methods(crow::HTTPMethod::GET)
+    .methods(crow::HTTPMethod::Get)
     ([&app](const crow::request& req, int repo_id)
     {
       dao::RepositoryDAO repo_dao;
@@ -275,9 +277,9 @@ namespace codelab::api
     });
 
     // Get tree
-    // GET /api/v1/repositories/{id}/tree
+    // Get /api/v1/repositories/{id}/tree
     CROW_ROUTE(app, "/api/v1/repositories/<int>/tree")
-    .methods(crow::HTTPMethod::GET)
+    .methods(crow::HTTPMethod::Get)
     ([&app](const crow::request& req, int repo_id)
     {
       dao::RepositoryDAO repo_dao;
@@ -314,9 +316,9 @@ namespace codelab::api
     });
 
     // Get blob
-    // GET /api/v1/repositories/{id}/blob
+    // Get /api/v1/repositories/{id}/blob
     CROW_ROUTE(app, "/api/v1/repositories/<int>/blob")
-    .methods(crow::HTTPMethod::GET)
+    .methods(crow::HTTPMethod::Get)
     ([&app](const crow::request& req, int repo_id)
     {
       dao::RepositoryDAO repo_dao;
@@ -357,9 +359,9 @@ namespace codelab::api
     // region --- GIT SMART HTTP ---
 
     // Handshake
-    // GET /git/{repo_id}.git/info/refs?service=git-upload-pack
+    // Get /git/{repo_id}.git/info/refs?service=git-upload-pack
     CROW_ROUTE(app, "/git/<int>.git/info/refs")
-    .methods(crow::HTTPMethod::GET)
+    .methods(crow::HTTPMethod::Get)
     ([](const crow::request& req, int repo_id){
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
@@ -410,10 +412,10 @@ namespace codelab::api
     });
 
     // Data transfer
-    // POST /git/{repo_id}.git/git-upload-pack
-    // POST /git/{repo_id}.git/git-receive-pack
+    // Post /git/{repo_id}.git/git-upload-pack
+    // Post /git/{repo_id}.git/git-receive-pack
     CROW_ROUTE(app, "/git/<int>.git/<string>")
-    .methods(crow::HTTPMethod::POST)
+    .methods(crow::HTTPMethod::Post)
     ([](const crow::request& req, int repo_id, const std::string& service){
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
@@ -462,6 +464,81 @@ namespace codelab::api
       res.set_header("Content-Type", "application/x-" + service + "-result");
       res.set_header("Cache-Control", "no-cache");
       return res;
+    });
+
+    // endregion
+
+    // region --- SSH ---
+
+    // List SSH keys
+    // Get /api/v1/user/keys
+    CROW_ROUTE(app, "/api/v1/user/keys")
+    .methods(crow::HTTPMethod::Get)
+    ([&app](const crow::request& req)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      dao::SSHKeyDAO ssh_dao;
+      auto keys = ssh_dao.ListByUser(ctx.user_id);
+
+      crow::json::wvalue res = crow::json::wvalue::list();
+      for (size_t i = 0; i < keys.size(); i++)
+      {
+        res[i]["id"] = keys[i].id;
+        res[i]["title"] = keys[i].title;
+        res[i]["key"] = keys[i].key_content;
+        res[i]["created_at"] = keys[i].created_at;
+      }
+
+      return crow::response(200, res);
+    });
+
+    // Add SSH key
+    // Post /api/v1/user/keys
+    CROW_ROUTE(app, "/api/v1/user/keys")
+    .methods(crow::HTTPMethod::Post)
+    ([&app](const crow::request& req)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      auto data = crow::json::load(req.body);
+      if (!data || !data.has("title") || !data.has("key"))
+      {
+        return crow::response(400, "Invalid JSON - title and key required");
+      }
+
+      std::string title = data["title"].s();
+      std::string key = data["key"].s();
+
+      services::SSHService ssh_service;
+      auto id = ssh_service.AddKey(ctx.user_id, title, key);
+
+      if (id)
+      {
+        crow::json::wvalue res;
+        res["id"] = *id;
+        res["message"] = "Key added";
+        return crow::response(200, res);
+      }
+
+      return crow::response(400, "Invalid key format");
+    });
+
+    // Delete SSH key
+    // DELETE /api/v1/user/keys/<id>
+    CROW_ROUTE(app, "/api/v1/user/keys/<int>")
+    .methods(crow::HTTPMethod::Delete)
+    ([&app](const crow::request& req, int key_id){
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      services::SSHService service;
+      bool success = service.RemoveKey(key_id, ctx.user_id);
+
+      if (success) return crow::response(200, "Key deleted");
+      return crow::response(404, "Key not found");
     });
 
     // endregion
