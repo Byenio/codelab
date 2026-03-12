@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS ssh_keys (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
-    title TEXT,
+    title TEXT NOT NULL,
     key_content TEXT NOT NULL,
     fingerprint TEXT UNIQUE,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
