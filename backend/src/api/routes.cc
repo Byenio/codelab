@@ -200,20 +200,21 @@ namespace codelab::api
     CROW_ROUTE(app, "/api/v1/user/repositories")
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req){
-        auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-        if (ctx.user_id == 0) return crow::response(401);
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
 
-        dao::RepositoryDAO dao;
-        auto repos = dao.ListByUser(ctx.user_id);
+      dao::RepositoryDAO dao;
+      auto repos = dao.ListByUser(ctx.user_id);
 
-        crow::json::wvalue res = crow::json::wvalue::list();
-        for (size_t i = 0; i < repos.size(); i++) {
-            res[i]["id"] = repos[i].id;
-            res[i]["name"] = repos[i].name;
-            res[i]["description"] = repos[i].description;
-            res[i]["is_private"] = repos[i].is_private;
-        }
-        return crow::response(200, res);
+      crow::json::wvalue res = crow::json::wvalue::list();
+      for (size_t i = 0; i < repos.size(); i++) {
+        res[i]["id"] = repos[i].id;
+        res[i]["name"] = repos[i].name;
+        res[i]["description"] = repos[i].description;
+        res[i]["is_private"] = repos[i].is_private;
+        res[i]["created_at"] = repos[i].created_at;
+      }
+      return crow::response(200, res);
     });
 
     // endregion
