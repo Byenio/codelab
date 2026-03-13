@@ -81,6 +81,9 @@ RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/s
 RUN echo "AllowUsers git" >> /etc/ssh/sshd_config
 
 COPY entrypoint.sh /app/entrypoint.sh
+
+RUN apt-get update && apt-get install -y dos2unix && dos2unix /app/entrypoint.sh && rm -rf /var/lib/apt/lists/*
+
 RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8080 22

@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import guest from "~~/middleware/guest";
+
+definePageMeta({
+  middleware: guest
+})
+
 const form = reactive({
   username: '',
   password: ''
@@ -29,14 +35,13 @@ async function handleLogin() {
         color: 'success'
       })
 
-      // Navigate to dashboard
-      // await navigateTo('/dashboard')
+      await navigateTo('/dashboard')
     }
   } catch (error: any) {
     toast.add({
       title: 'Login Failed',
       description: error.data?.error || error.message,
-      color: 'error' // or 'danger'
+      color: 'error'
     })
   } finally {
     isLoading.value = false
@@ -54,7 +59,7 @@ async function handleLogin() {
         </div>
       </template>
 
-      <form @submit.prevent="handleLogin" class="space-y-4">
+      <form @submit.prevent="handleLogin" method="POST" class="space-y-4">
         <UFormField label="Username" name="username">
           <UInput
               v-model="form.username"

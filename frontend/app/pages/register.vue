@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import guest from "~~/middleware/guest";
+
+definePageMeta({
+  middleware: guest
+})
+
 const form = reactive({
   username: '',
   email: '',
@@ -45,7 +51,7 @@ async function handleRegister() {
         </div>
       </template>
 
-      <form @submit.prevent="handleRegister" class="space-y-4">
+      <form @submit.prevent="handleRegister" method="POST" class="space-y-4">
         <UFormField label="Username" name="username">
           <UInput v-model="form.username" icon="i-heroicons-user" class="w-full" />
         </UFormField>

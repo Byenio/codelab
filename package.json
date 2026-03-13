@@ -3,5 +3,8 @@
     "@iconify-json/heroicons": "^1.2.3",
     "@iconify-json/lucide": "^1.2.97",
     "@iconify-json/simple-icons": "^1.2.73"
+  },
+  "dependencies": {
+    "defu": "^6.1.4"
   }
 }
