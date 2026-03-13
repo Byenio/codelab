@@ -5,6 +5,7 @@
     "@iconify-json/simple-icons": "^1.2.73"
   },
   "dependencies": {
-    "defu": "^6.1.4"
+    "defu": "^6.1.4",
+    "zod": "^4.3.6"
   }
 }
