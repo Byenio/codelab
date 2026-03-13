@@ -182,7 +182,9 @@ namespace codelab::api
         dir_id = static_cast<int>(data["directory_id"].i());
       }
 
-      services::RepoService repo_service;
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
       auto result = repo_service.CreateRepository(user_id, dir_id, name, description, is_private, init_readme);
 
       if (result)
