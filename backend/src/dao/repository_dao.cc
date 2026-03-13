@@ -40,10 +40,10 @@ namespace codelab::dao
     std::string sql;
     if (directory_id.has_value())
     {
-      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash FROM repositories WHERE user_id=? AND directory_id=? AND name=?;";
+      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash, is_private, created_at FROM repositories WHERE user_id=? AND directory_id=? AND name=?;";
     } else
     {
-      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash FROM repositories WHERE user_id=? AND directory_id IS NULL AND name=?;";
+      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash, is_private, created_at FROM repositories WHERE user_id=? AND directory_id IS NULL AND name=?;";
     }
 
     if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return std::nullopt;
@@ -58,7 +58,11 @@ namespace codelab::dao
       r.user_id = sqlite3_column_int(stmt, 1);
       if (sqlite3_column_type(stmt, 2) != SQLITE_NULL) r.directory_id = sqlite3_column_int(stmt, 2);
       r.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+      auto desc = sqlite3_column_text(stmt, 4);
+      r.description = desc ? reinterpret_cast<const char*>(desc) : "";
       r.disk_path_hash = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
+      r.is_private = sqlite3_column_int(stmt, 6) != 0;
+      r.created_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
       sqlite3_finalize(stmt);
       return r;
     }
@@ -69,8 +73,7 @@ namespace codelab::dao
   std::optional<models::Repository> RepositoryDAO::FindById(int id) {
     auto& db = core::Database::GetInstance();
     sqlite3_stmt* stmt;
-    std::string sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash, is_private FROM repositories WHERE id = ?;";
-
+    std::string sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash, is_private, created_at FROM repositories WHERE id = ?;";
     if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return std::nullopt;
 
     sqlite3_bind_int(stmt, 1, id);
@@ -81,9 +84,14 @@ namespace codelab::dao
       r.user_id = sqlite3_column_int(stmt, 1);
       if (sqlite3_column_type(stmt, 2) != SQLITE_NULL) r.directory_id = sqlite3_column_int(stmt, 2);
       r.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
-      r.description = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 4));
+
+      auto desc = sqlite3_column_text(stmt, 4);
+      r.description = desc ? reinterpret_cast<const char*>(desc) : "";
+
       r.disk_path_hash = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 5));
       r.is_private = sqlite3_column_int(stmt, 6) != 0;
+      r.created_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
+
       sqlite3_finalize(stmt);
       return r;
     }
@@ -100,10 +108,10 @@ namespace codelab::dao
     std::string sql;
     if (directory_id.has_value())
     {
-      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash FROM repositories WHERE user_id=? AND directory_id=?;";
+      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash, is_private, created_at FROM repositories WHERE user_id=? AND directory_id=?;";
     } else
     {
-      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash FROM repositories WHERE user_id=? AND directory_id IS NULL;";
+      sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash, is_private, created_at FROM repositories WHERE user_id=? AND directory_id IS NULL;";
     }
 
     if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return results;
@@ -124,9 +132,45 @@ namespace codelab::dao
         repo.directory_id = sqlite3_column_int(stmt, 2);
       }
       repo.name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 3));
-      repo.description = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 4));
+      auto desc = sqlite3_column_text(stmt, 4);
+      repo.description = desc ? reinterpret_cast<const char*>(desc) : "";
       repo.disk_path_hash = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 5));
       repo.is_private = sqlite3_column_int(stmt, 6) != 0;
+      repo.created_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
+      results.push_back(repo);
+    }
+
+    sqlite3_finalize(stmt);
+    return results;
+  }
+
+  std::vector<models::Repository> RepositoryDAO::ListByUser(int user_id)
+  {
+    std::vector<models::Repository> results;
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+
+    std::string sql = "SELECT id, user_id, directory_id, name, description, disk_path_hash, is_private, created_at FROM repositories WHERE user_id=? ORDER BY created_at DESC;";
+
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return results;
+
+    sqlite3_bind_int(stmt, 1, user_id);
+
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+      models::Repository repo;
+      repo.id = sqlite3_column_int(stmt, 0);
+      repo.user_id = sqlite3_column_int(stmt, 1);
+      if (sqlite3_column_type(stmt, 2) != SQLITE_NULL)
+      {
+        repo.directory_id = sqlite3_column_int(stmt, 2);
+      }
+      repo.name = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 3));
+      auto desc = sqlite3_column_text(stmt, 4);
+      repo.description = desc ? reinterpret_cast<const char*>(desc) : "";
+      repo.disk_path_hash = reinterpret_cast<const char *>(sqlite3_column_text(stmt, 5));
+      repo.is_private = sqlite3_column_int(stmt, 6) != 0;
+      repo.created_at = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 7));
       results.push_back(repo);
     }
 

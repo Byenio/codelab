@@ -15,6 +15,7 @@ namespace codelab::models
     std::string description;
     bool is_private;
     std::string disk_path_hash;
+    std::string created_at;
   };
 }
 

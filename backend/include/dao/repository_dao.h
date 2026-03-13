@@ -16,6 +16,7 @@ namespace codelab::dao
     std::optional<models::Repository> FindById(int id);
 
     std::vector<models::Repository> ListByDirectory(int user_id, std::optional<int> directory_id);
+    std::vector<models::Repository> ListByUser(int user_id);
   };
 }
 
