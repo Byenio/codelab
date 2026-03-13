@@ -14,14 +14,14 @@ const formatDate = (dateStr: string) => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
+  <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950">
     <!-- Top Navigation Bar -->
-    <header class="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+    <header class="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16 items-center">
           <div class="flex items-center gap-4">
             <h1 class="text-xl font-bold text-primary-500">CodeLab</h1>
-            <nav class="hidden md:flex gap-4 text-sm font-medium text-gray-600 dark:text-gray-300">
+            <nav class="hidden md:flex gap-4 text-sm font-medium text-zinc-600 dark:text-zinc-300">
               <NuxtLink to="/dashboard" class="hover:text-primary-500">Dashboard</NuxtLink>
               <NuxtLink to="/settings" class="hover:text-primary-500">Settings</NuxtLink>
             </nav>
@@ -53,7 +53,7 @@ const formatDate = (dateStr: string) => {
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
       <div class="flex justify-between items-center mb-6">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Your Repositories</h2>
+        <h2 class="text-2xl font-bold text-zinc-900 dark:text-white">Your Repositories</h2>
       </div>
 
       <!-- Loading State -->
@@ -73,9 +73,9 @@ const formatDate = (dateStr: string) => {
 
       <!-- Empty State -->
       <div v-if="repos && repos.length === 0" class="text-center py-12">
-        <UIcon name="i-heroicons-cube-transparent" class="w-16 h-16 mx-auto text-gray-400 mb-4" />
-        <h3 class="text-lg font-medium text-gray-900 dark:text-white">No repositories yet</h3>
-        <p class="mt-1 text-gray-500">Get started by creating your first project.</p>
+        <UIcon name="i-heroicons-cube-transparent" class="w-16 h-16 mx-auto text-zinc-400 mb-4" />
+        <h3 class="text-lg font-medium text-zinc-900 dark:text-white">No repositories yet</h3>
+        <p class="mt-1 text-zinc-500">Get started by creating your first project.</p>
         <UButton to="/new" class="mt-6" icon="i-heroicons-plus">Create Repository</UButton>
       </div>
 
@@ -91,7 +91,7 @@ const formatDate = (dateStr: string) => {
             <template #header>
               <div class="flex justify-between items-start">
                 <div class="flex items-center gap-2">
-                  <UIcon name="i-heroicons-book-open" class="text-gray-500" />
+                  <UIcon name="i-heroicons-book-open" class="text-zinc-500" />
                   <span class="font-semibold text-lg hover:text-primary-500 hover:underline">
                     {{ repo.name }}
                   </span>
@@ -101,14 +101,14 @@ const formatDate = (dateStr: string) => {
               </div>
             </template>
 
-            <p class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2 h-10">
+            <p class="text-sm text-zinc-500 dark:text-zinc-400 line-clamp-2 h-10">
               {{ repo.description || 'No description provided.' }}
             </p>
 
             <template #footer>
-              <div class="flex items-center gap-2 text-xs text-gray-400">
+              <div class="flex items-center gap-2 text-xs text-zinc-400">
                 <span class="w-2 h-2 rounded-full bg-yellow-400"></span>
-                <span>C++</span> <!-- Placeholder for language detection -->
+                <span>C++</span> <!-- TODO: language detection -->
                 <span class="ml-auto">Updated {{ formatDate(repo.created_at) }}</span>
               </div>
             </template>
