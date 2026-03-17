@@ -65,4 +65,13 @@ namespace codelab::services
     repo.id = id.value();
     return repo;
   }
+
+  std::vector<models::FileEntry> RepoService::GetFileTree(int user_id, const std::string &repo_name, const std::string &branch, const std::string &path)
+  {
+    auto repo = repo_dao_.FindByName(user_id, std::nullopt, repo_name);
+
+    if (!repo) return {};
+
+    return storage_.ListFiles(repo->disk_path_hash, branch, path);
+  }
 }

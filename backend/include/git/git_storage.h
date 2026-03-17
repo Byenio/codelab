@@ -2,8 +2,10 @@
 #define CODELAB_GIT_STORAGE_H
 
 #include <string>
-#include <git2.h>
 #include <filesystem>
+#include <vector>
+#include <git2.h>
+#include "models/file_entry.h"
 
 namespace codelab::git
 {
@@ -15,6 +17,8 @@ namespace codelab::git
     bool InitRepo(const std::string& disk_path_hash, const std::string& repo_name, bool with_readme = false);
     bool DeleteRepo(const std::string& disk_path_hash);
     bool Exists(const std::string& disk_path_hash);
+
+    std::vector<models::FileEntry> ListFiles(const std::string& disk_path_hash, const std::string& branch, const std::string& directory_path);
 
   private:
     std::string root_path_;

@@ -4,6 +4,7 @@
 #include "dao/directory_dao.h"
 #include "dao/repository_dao.h"
 #include "git/git_storage.h"
+#include "models/file_entry.h"
 #include "models/respository.h"
 
 namespace codelab::services
@@ -21,6 +22,8 @@ namespace codelab::services
       bool is_private,
       bool init_readme = false
     );
+
+    std::vector<models::FileEntry> GetFileTree(int user_id, const std::string& repo_name, const std::string& branch, const std::string& path);
 
   private:
     dao::RepositoryDAO repo_dao_;

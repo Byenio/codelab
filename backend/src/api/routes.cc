@@ -219,6 +219,60 @@ namespace codelab::api
       return crow::response(200, res);
     });
 
+    // Get repository details
+    // GET /api/v1/repositories/<repo_name>
+    CROW_ROUTE(app, "/api/v1/repositories/<string>")
+    .methods(crow::HTTPMethod::GET)
+    ([&app](const crow::request& req, const std::string& repo_name){
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      dao::RepositoryDAO dao;
+      auto repo = dao.FindByName(ctx.user_id, std::nullopt, repo_name);
+
+      if (!repo) {
+          return crow::response(404, "Repository not found");
+      }
+
+      crow::json::wvalue res;
+      res["id"] = repo->id;
+      res["name"] = repo->name;
+      res["description"] = repo->description;
+      res["is_private"] = repo->is_private;
+      res["created_at"] = repo->created_at;
+
+      return crow::response(200, res);
+    });
+
+    // Get repository file tree
+    // GET /api/v1/repositories/<repo_name>/tree?branch=master&path=src/
+    CROW_ROUTE(app, "/api/v1/repositories/<string>/tree")
+    .methods(crow::HTTPMethod::Get)
+    ([&app](const crow::request& req, const std::string& repo_name)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "master";
+      std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
+
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService service(storage_path);
+
+      auto files = service.GetFileTree(ctx.user_id, repo_name, branch, path);
+
+      crow::json::wvalue res = crow::json::wvalue::list();
+      for (size_t i = 0; i < files.size(); i++)
+      {
+        res[i]["name"] = files[i].name;
+        res[i]["path"] = files[i].path;
+        res[i]["is_directory"] = files[i].is_directory;
+        res[i]["size"] = files[i].size;
+      }
+
+      return crow::response(200, res);
+    });
+
     // endregion
 
     // region --- GIT OPERATIONS ---
