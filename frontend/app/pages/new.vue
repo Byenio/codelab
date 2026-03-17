@@ -52,12 +52,12 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950 py-12">
+  <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-12">
     <UContainer class="max-w-2xl">
 
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Create a new repository</h1>
-        <p class="text-gray-500 mt-2">A repository contains all project files, including the revision history.</p>
+        <h1 class="text-3xl font-bold text-zinc-900 dark:text-white">Create a new repository</h1>
+        <p class="text-zinc-500 mt-2">A repository contains all project files, including the revision history.</p>
       </div>
 
       <UCard>
@@ -81,16 +81,16 @@ async function onSubmit() {
             />
           </UFormField>
 
-          <hr class="border-gray-200 dark:border-gray-800" />
+          <hr class="border-zinc-200 dark:border-zinc-800" />
 
           <!-- Visibility Options -->
           <div class="space-y-3">
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Visibility</label>
+            <label class="block text-sm font-medium text-zinc-700 dark:text-zinc-200">Visibility</label>
 
             <!-- Public Option -->
             <div
                 class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors"
-                :class="!form.is_private ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20' : 'border-gray-200 dark:border-gray-800'"
+                :class="!form.is_private ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20' : 'border-zinc-200 dark:border-zinc-800'"
                 @click="form.is_private = false"
             >
               <URadio v-model="form.is_private" :value="false" />
@@ -99,14 +99,14 @@ async function onSubmit() {
                   <UIcon name="i-heroicons-globe-alt" />
                   Public
                 </div>
-                <p class="text-sm text-gray-500">Anyone on the internet can see this repository.</p>
+                <p class="text-sm text-zinc-500">Anyone on the internet can see this repository.</p>
               </div>
             </div>
 
             <!-- Private Option -->
             <div
                 class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors"
-                :class="form.is_private ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20' : 'border-gray-200 dark:border-gray-800'"
+                :class="form.is_private ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20' : 'border-zinc-200 dark:border-zinc-800'"
                 @click="form.is_private = true"
             >
               <URadio v-model="form.is_private" :value="true" />
@@ -115,12 +115,12 @@ async function onSubmit() {
                   <UIcon name="i-heroicons-lock-closed" />
                   Private
                 </div>
-                <p class="text-sm text-gray-500">You choose who can see and commit to this repository.</p>
+                <p class="text-sm text-zinc-500">You choose who can see and commit to this repository.</p>
               </div>
             </div>
           </div>
 
-          <hr class="border-gray-200 dark:border-gray-800" />
+          <hr class="border-zinc-200 dark:border-zinc-800" />
 
           <!-- Initialization -->
           <UFormField>

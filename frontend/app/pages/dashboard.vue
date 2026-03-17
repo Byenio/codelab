@@ -87,16 +87,16 @@ const formatDate = (dateStr: string) => {
             :to="`/${repo.name}`"
             class="block"
         >
-          <UCard class="h-full hover:border-primary-500 transition-colors cursor-pointer">
+          <UCard class="h-full hover:border-primary-500 transition-colors cursor-pointer bg-zinc-900">
             <template #header>
               <div class="flex justify-between items-start">
                 <div class="flex items-center gap-2">
                   <UIcon name="i-heroicons-book-open" class="text-zinc-500" />
-                  <span class="font-semibold text-lg hover:text-primary-500 hover:underline">
+                  <span class="font-semibold text-xl hover:text-primary-500 hover:underline">
                     {{ repo.name }}
                   </span>
-                  <UBadge v-if="repo.is_private" color="primary" size="xs" variant="solid">Private</UBadge>
-                  <UBadge v-else color="success" size="xs" variant="subtle">Public</UBadge>
+                  <UBadge v-if="repo.is_private" color="primary" size="sm" variant="solid">Private</UBadge>
+                  <UBadge v-else color="success" size="sm" variant="subtle">Public</UBadge>
                 </div>
               </div>
             </template>

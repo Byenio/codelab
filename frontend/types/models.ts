@@ -20,3 +20,12 @@ export interface Directory {
     parent_id?: number
     name: string
 }
+
+export interface FileEntry {
+    name: string
+    path: string
+    is_directory: boolean
+    last_commit_msg: string
+    last_commit_date: string
+    size: number
+}

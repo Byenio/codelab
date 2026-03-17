@@ -42,7 +42,7 @@ async function handleRegister() {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950 p-4">
+  <div class="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
     <UCard class="w-full max-w-md">
       <template #header>
         <div class="flex items-center gap-2">
@@ -70,7 +70,7 @@ async function handleRegister() {
       </form>
 
       <template #footer>
-        <p class="text-sm text-center text-gray-500">
+        <p class="text-sm text-center text-zinc-500">
           Already have an account?
           <NuxtLink to="/login" class="text-primary-500 hover:underline">
             Sign in
