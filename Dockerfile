@@ -74,9 +74,15 @@ COPY --from=builder /app/backend/db/schema.sql /app/data/db/schema.sql
 RUN mkdir -p /app/db
 COPY --from=builder /app/backend/db/schema.sql /app/db/schema.sql
 
+RUN sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config || echo "UsePAM no" >> /etc/ssh/sshd_config
+RUN sed -i 's/#StrictModes yes/StrictModes no/' /etc/ssh/sshd_config || echo "StrictModes no" >> /etc/ssh/sshd_config
+RUN sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+
 RUN sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
 RUN sed -i 's/AuthorizedKeysFile.*/AuthorizedKeysFile .ssh\/authorized_keys/' /etc/ssh/sshd_config
 RUN sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+
+RUN rm -f /etc/ssh/sshd_config.d/*.conf
 
 RUN echo "AllowUsers git" >> /etc/ssh/sshd_config
 

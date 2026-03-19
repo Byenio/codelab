@@ -7,6 +7,7 @@
 #include "core/config.h"
 #include "core/db.h"
 #include "middleware/auth_middleware.h"
+#include "services/ssh_service.h"
 
 int main(int argc, char** argv) {
   auto& config = codelab::core::Config::GetInstance();
@@ -31,6 +32,15 @@ int main(int argc, char** argv) {
     db.Connect(db_path);
     std::string db_schema_path = config.GetString("DB_SCHEMA_PATH", "db/schema.sql");
     db.ApplySchema(db_schema_path);
+
+    codelab::services::SSHService ssh_service;
+    if (ssh_service.SyncAuthorizedKeysFile())
+    {
+      std::cout << "[+] SSH key synced successfully" << std::endl;
+    } else
+    {
+      std::cerr << "[!] Failed to sync SSH keys" << std::endl;
+    }
   } catch (const std::exception& e)
   {
     std::cerr << "[!] Database error: " << e.what() << std::endl;
