@@ -1,22 +1,69 @@
 <script setup lang="ts">
-import {useApi} from "~~/composables/useApi";
-import {type FileEntry, type Repository} from "~~/types/models";
+import { useApi } from "~~/composables/useApi";
+import type { FileEntry, Repository } from "~~/types/models";
 
 const route = useRoute()
-const repoName = route.params.repo as string
+const router = useRouter()
 
-const { data: files, error } = await useApi<FileEntry[]>(`/api/v1/repositories/${repoName}/tree`, {
-  query: { branch: 'master' }
+const repoName = computed(() => route.params.repo as string)
+
+const currentBranch = computed(() => (route.query.branch as string) || 'master')
+const currentPath = computed(() => (route.query.path as string) || '')
+const viewType = computed(() => (route.query.type as string) || 'tree')
+
+const repoUrl = computed(() => repoName.value ? `/api/v1/repositories/${repoName.value}` : null)
+const { data: repo } = await useApi<Repository>(repoUrl)
+
+const treeUrl = computed(() => {
+  if (!repoName.value || viewType.value !== 'tree') return null
+  return `/api/v1/repositories/${repoName.value}/tree`
 })
 
-const { data: repo } = await useApi<Repository>(`/api/v1/repositories/${repoName}`)
+const { data: files, pending: loadingFiles } = useApi<FileEntry[]>(
+    treeUrl,
+    {
+      query: { branch: currentBranch, path: currentPath },
+      watch: [currentBranch, currentPath]
+    }
+)
+
+const blobUrl = computed(() => {
+  if (!repoName.value || viewType.value !== 'blob') return null
+  return `/api/v1/repositories/${repoName.value}/blob`
+})
+
+const { data: fileContent, pending: loadingBlob } = useApi<{content: string}>(
+    blobUrl,
+    {
+      query: { branch: currentBranch, path: currentPath },
+      watch: [currentBranch, currentPath]
+    }
+)
+
+const navigateToItem = (item: FileEntry) => {
+  const newPath = currentPath.value ? `${currentPath.value}/${item.name}` : item.name
+
+  if (item.is_directory) {
+    router.push({ query: { ...route.query, path: newPath, type: 'tree' } })
+  } else {
+    router.push({ query: { ...route.query, path: newPath, type: 'blob' } })
+  }
+}
+
+const goUp = () => {
+  if (!currentPath.value) return
+  const segments = currentPath.value.split('/')
+  segments.pop()
+  const newPath = segments.join('/')
+
+  router.push({ query: { ...route.query, path: newPath, type: 'tree' } })
+}
 
 const iconMap: Record<string, string> = {
   'README.md': 'i-heroicons-document-text',
   'default': 'i-heroicons-document',
   'folder': 'i-heroicons-folder'
 }
-
 const getFileIcon = (file: FileEntry) => {
   if (file.is_directory) return iconMap['folder'];
   return iconMap[file.name] || iconMap['default'];
@@ -25,34 +72,58 @@ const getFileIcon = (file: FileEntry) => {
 
 <template>
   <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-    <!-- Header with Breadcrumbs -->
+    <!-- Header -->
     <header class="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 p-4">
       <div class="max-w-7xl mx-auto flex items-center gap-2 text-lg">
         <UIcon name="i-heroicons-book-open" class="text-zinc-500" />
-        <span class="font-semibold text-primary-500">{{ repoName }}</span>
-        <UBadge v-if="repo?.is_private" color="primary" size="xs">Private</UBadge>
+        <NuxtLink :to="`/${repoName}`" class="font-semibold text-primary-500 hover:underline">
+          {{ repoName }}
+        </NuxtLink>
+        <span v-if="currentPath" class="text-zinc-400">/</span>
+        <span v-if="currentPath" class="text-zinc-600 dark:text-zinc-300">{{ currentPath }}</span>
+        <UBadge v-if="repo?.is_private" color="neutral" size="xs">Private</UBadge>
       </div>
     </header>
 
     <main class="max-w-7xl mx-auto p-6">
-      <UAlert v-if="error" color="error" variant="subtle" title="Error" :description="error.message" />
 
-      <!-- File Browser -->
-      <UCard class="mb-8">
+      <!-- Controls -->
+      <div class="mb-4 flex gap-2">
+        <UButton
+            v-if="currentPath"
+            icon="i-heroicons-arrow-left"
+            color="neutral"
+            variant="ghost"
+            size="sm"
+            @click="goUp"
+        >
+          Back
+        </UButton>
+        <USelectMenu :options="['master']" v-model="currentBranch" size="sm" />
+      </div>
+
+      <!-- VIEW MODE: TREE (File List) -->
+      <UCard v-if="viewType === 'tree'" class="mb-8">
         <div class="border-b border-zinc-100 dark:border-zinc-800 p-3 bg-zinc-50 dark:bg-zinc-900/50 rounded-t-lg flex justify-between">
-          <div class="flex items-center gap-2">
-            <UAvatar size="xs" src="https://github.com/ghost.png" />
-            <span class="font-bold text-sm">Last Commit:</span>
-            <span class="text-sm text-zinc-500 font-mono">Initial commit</span>
+          <div class="flex items-center gap-2 text-sm text-zinc-500">
+            <span class="font-mono">latest commit</span>
           </div>
-          <span class="text-xs text-zinc-400">2 minutes ago</span>
         </div>
 
-        <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
+        <div v-if="loadingFiles" class="p-8 flex justify-center">
+          <UIcon name="i-heroicons-arrow-path" class="animate-spin w-6 h-6 text-zinc-400" />
+        </div>
+
+        <div v-else class="divide-y divide-zinc-100 dark:divide-zinc-800">
+          <div v-if="currentPath" @click="goUp" class="p-2 px-3 text-blue-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer text-sm font-bold">
+            ..
+          </div>
+
           <div
               v-for="file in files"
               :key="file.path"
-              class="flex items-center justify-between p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer"
+              @click="navigateToItem(file)"
+              class="flex items-center justify-between p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group"
           >
             <div class="flex items-center gap-3">
               <UIcon
@@ -60,26 +131,37 @@ const getFileIcon = (file: FileEntry) => {
                   :class="file.is_directory ? 'text-blue-400' : 'text-zinc-400'"
                   class="w-5 h-5"
               />
-              <span class="text-sm text-zinc-700 dark:text-zinc-200">{{ file.name }}</span>
+              <span class="text-sm text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500 group-hover:underline">
+                {{ file.name }}
+              </span>
             </div>
-            <span class="text-xs text-zinc-400">3 days ago</span>
+            <span class="text-xs text-zinc-400">{{ file.size > 0 ? file.size + ' B' : '' }}</span>
+          </div>
+
+          <div v-if="!files || files.length === 0" class="p-8 text-center text-zinc-400 text-sm">
+            No files found in this directory.
           </div>
         </div>
       </UCard>
 
-      <!-- README Viewer -->
-      <UCard>
-        <template #header>
-          <h3 class="font-bold flex items-center gap-2">
-            <UIcon name="i-heroicons-bars-3-bottom-left" />
-            README.md
-          </h3>
-        </template>
-        <div class="prose dark:prose-invert max-w-none p-4">
-          <h1>{{ repoName }}</h1>
-          <p>Initialized with CodeLab.</p>
+      <!-- VIEW MODE: BLOB (File Content) -->
+      <UCard v-else-if="viewType === 'blob'" class="overflow-hidden">
+        <div class="border-b border-zinc-200 dark:border-zinc-800 p-2 bg-zinc-100 dark:bg-zinc-900 flex justify-between items-center">
+          <div class="text-sm font-mono text-zinc-600 dark:text-zinc-300 px-2">
+            {{ currentPath }}
+          </div>
+          <UButton icon="i-heroicons-clipboard" color="neutral" variant="ghost" size="xs">Copy</UButton>
+        </div>
+
+        <div v-if="loadingBlob" class="p-12 flex justify-center">
+          <UIcon name="i-heroicons-arrow-path" class="animate-spin w-8 h-8 text-zinc-300" />
+        </div>
+
+        <div v-else class="p-0 overflow-x-auto">
+          <pre class="text-sm font-mono p-4 text-zinc-800 dark:text-zinc-200">{{ fileContent?.content }}</pre>
         </div>
       </UCard>
+
     </main>
   </div>
 </template>

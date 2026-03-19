@@ -24,6 +24,7 @@ namespace codelab::services
     );
 
     std::vector<models::FileEntry> GetFileTree(int user_id, const std::string& repo_name, const std::string& branch, const std::string& path);
+    std::optional<std::string> GetFileContent(int user_id, const std::string& repo_name, const std::string& branch, const std::string& filepath);
 
   private:
     dao::RepositoryDAO repo_dao_;

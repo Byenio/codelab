@@ -273,6 +273,32 @@ namespace codelab::api
       return crow::response(200, res);
     });
 
+    // Get file content
+    // GET /api/v1/repositories/<repo>/blob?path=src/main.cc
+    CROW_ROUTE(app, "/api/v1/repositories/<string>/blob")
+    .methods(crow::HTTPMethod::GET)
+    ([&app](const crow::request& req, std::string repo_name){
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "master";
+      std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
+
+      if (path.empty()) return crow::response(400, "Path is required");
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService service(storage_path);
+
+      auto content = service.GetFileContent(ctx.user_id, repo_name, branch, path);
+
+      if (content) {
+          crow::json::wvalue res;
+          res["content"] = *content;
+          return crow::response(200, res);
+      }
+      return crow::response(404, "File not found");
+    });
+
     // endregion
 
     // region --- GIT OPERATIONS ---

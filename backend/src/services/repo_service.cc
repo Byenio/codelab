@@ -74,4 +74,11 @@ namespace codelab::services
 
     return storage_.ListFiles(repo->disk_path_hash, branch, path);
   }
+
+  std::optional<std::string> RepoService::GetFileContent(int user_id, const std::string &repo_name, const std::string &branch, const std::string &filepath)
+  {
+    auto repo = repo_dao_.FindByName(user_id, std::nullopt, repo_name);
+    if (!repo) return std::nullopt;
+    return storage_.GetFileContent(repo->disk_path_hash, branch, filepath);
+  }
 }

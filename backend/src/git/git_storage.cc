@@ -162,4 +162,51 @@ namespace codelab::git
 
     return entries;
   }
+
+  std::optional<std::string> GitStorage::GetFileContent(const std::string &disk_path_hash, const std::string &branch,
+    const std::string &filepath)
+  {
+    std::string full_path = GetFullPath(disk_path_hash);
+    git_repository* repo = nullptr;
+    if (git_repository_open(&repo, full_path.c_str()) != 0) return std::nullopt;
+
+    git_object* obj = nullptr;
+    std::string ref = branch.empty() ? "HEAD" : branch;
+    if (git_revparse_single(&obj, repo, ref.c_str()) != 0)
+    {
+      git_repository_free(repo);
+      return std::nullopt;
+    }
+
+    git_tree* tree = nullptr;
+    if (git_object_peel((git_object**)&tree, obj, GIT_OBJ_TREE) != 0)
+    {
+      git_object_free(obj);
+      git_repository_free(repo);
+      return std::nullopt;
+    }
+    git_object_free(obj);
+
+    git_tree_entry* entry = nullptr;
+    std::optional<std::string> content = std::nullopt;
+
+    if (git_tree_entry_bypath(&entry, tree, filepath.c_str()) == 0)
+    {
+      git_object* blob_obj = nullptr;
+      if (git_tree_entry_to_object(&blob_obj, repo, entry) == 0)
+      {
+        if (git_object_type(blob_obj) == GIT_OBJ_BLOB)
+        {
+          const char* raw = (const char*)git_blob_rawcontent((git_blob*)blob_obj);
+          content = std::string(raw, git_blob_rawsize((git_blob*)blob_obj));
+        }
+        git_object_free(blob_obj);
+      }
+      git_tree_entry_free(entry);
+    }
+
+    git_tree_free(tree);
+    git_repository_free(repo);
+    return content;
+  }
 }

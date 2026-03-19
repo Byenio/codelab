@@ -6,6 +6,7 @@
 #include <vector>
 #include <git2.h>
 #include "models/file_entry.h"
+#include <optional>
 
 namespace codelab::git
 {
@@ -19,6 +20,7 @@ namespace codelab::git
     bool Exists(const std::string& disk_path_hash);
 
     std::vector<models::FileEntry> ListFiles(const std::string& disk_path_hash, const std::string& branch, const std::string& directory_path);
+    std::optional<std::string> GetFileContent(const std::string& disk_path_hash, const std::string& branch, const std::string& filepath);
 
   private:
     std::string root_path_;
