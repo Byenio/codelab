@@ -8,11 +8,14 @@ definePageMeta({
   middleware: auth
 })
 
+const route = useRoute()
+
 const form = reactive({
   name: '',
   description: '',
   is_private: false,
-  auto_init: true
+  auto_init: true,
+  directory_id: route.query.folder ? parseInt(route.query.folder as string) : null
 })
 
 const isLoading = ref(false)
@@ -27,7 +30,8 @@ async function onSubmit() {
         name: form.name,
         description: form.description,
         is_private: form.is_private,
-        init_readme: form.auto_init
+        init_readme: form.auto_init,
+        directory_id: form.directory_id
       }
     })
 

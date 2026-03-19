@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { z } from 'zod'
 import { useApi } from "~~/composables/useApi";
-
-// Define Key Type
-interface SSHKey {
-  id: number;
-  title: string;
-  key: string;
-  created_at: string;
-  fingerprint?: string;
-}
+import type {SSHKey} from "~~/types/models";
 
 // Fetch Keys
 const { data: keys, refresh } = await useApi<SSHKey[]>('/api/v1/user/keys')
@@ -17,6 +9,7 @@ const { data: keys, refresh } = await useApi<SSHKey[]>('/api/v1/user/keys')
 // Form State
 const isOpen = ref(false)
 const isLoading = ref(false)
+// Use reactive for form data
 const form = reactive({
   title: '',
   key: ''
@@ -30,7 +23,7 @@ async function addKey() {
 
   isLoading.value = true
   try {
-    await useApi('/api/v1/user/keys', {
+    const res = await useApi('/api/v1/user/keys', {
       method: 'POST',
       body: {
         title: form.title,
@@ -71,7 +64,39 @@ async function deleteKey(id: number) {
         <h2 class="text-lg font-bold text-zinc-900 dark:text-white">SSH Keys</h2>
         <p class="text-sm text-zinc-500">Manage SSH keys to access your repositories via Git.</p>
       </div>
-      <UButton icon="i-heroicons-plus" @click="isOpen = true">New SSH Key</UButton>
+
+      <!-- Add Key Modal with Trigger -->
+      <UModal v-model:open="isOpen">
+        <UButton icon="i-heroicons-plus" label="New SSH Key" />
+
+        <template #content>
+          <UCard>
+            <template #header>
+              <h3 class="font-bold">Add New SSH Key</h3>
+            </template>
+
+            <form @submit.prevent="addKey" class="space-y-4">
+              <UFormField label="Title" name="title">
+                <UInput v-model="form.title" placeholder="e.g. My Laptop" autofocus />
+              </UFormField>
+
+              <UFormField label="Key" name="key" help="Starts with ssh-rsa, ssh-ed25519, etc.">
+                <UTextarea
+                    v-model="form.key"
+                    placeholder="ssh-ed25519 AAAAC3Nz..."
+                    :rows="5"
+                    class="font-mono text-xs"
+                />
+              </UFormField>
+
+              <div class="flex justify-end gap-2 mt-4">
+                <UButton color="neutral" variant="ghost" @click="isOpen = false">Cancel</UButton>
+                <UButton type="submit" :loading="isLoading" :disabled="!form.title || !form.key">Add Key</UButton>
+              </div>
+            </form>
+          </UCard>
+        </template>
+      </UModal>
     </div>
 
     <!-- Key List -->
@@ -101,33 +126,6 @@ async function deleteKey(id: number) {
           />
         </div>
       </div>
-    </UCard>
-
-    <!-- Add Key Card -->
-    <UCard>
-      <template #header>
-        <h3 class="font-bold">Add New SSH Key</h3>
-      </template>
-
-      <form @submit.prevent="addKey" class="space-y-4">
-        <UFormField label="Title" name="title">
-          <UInput v-model="form.title" placeholder="e.g. My Laptop" autofocus />
-        </UFormField>
-
-        <UFormField label="Key" name="key" help="Starts with ssh-rsa, ssh-ed25519, etc.">
-          <UTextarea
-              v-model="form.key"
-              placeholder="ssh-ed25519 AAAAC3Nz..."
-              :rows="5"
-              class="font-mono text-xs"
-          />
-        </UFormField>
-
-        <div class="flex justify-end gap-2 mt-4">
-          <UButton color="gray" variant="ghost" @click="isOpen = false">Cancel</UButton>
-          <UButton type="submit" :loading="isLoading" :disabled="!form.title || !form.key">Add Key</UButton>
-        </div>
-      </form>
     </UCard>
   </div>
 </template>

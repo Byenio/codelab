@@ -29,3 +29,11 @@ export interface FileEntry {
     last_commit_date: string
     size: number
 }
+
+export interface SSHKey {
+    id: number;
+    title: string;
+    key: string;
+    created_at: string;
+    fingerprint?: string;
+}
