@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import guest from "~~/middleware/guest";
+import guest from "~/middleware/guest";
 
 definePageMeta({
   middleware: guest

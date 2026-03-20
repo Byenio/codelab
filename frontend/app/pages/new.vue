@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { z } from 'zod'
-import type { FormSubmitEvent } from '#ui/types'
-import auth from "~~/middleware/auth";
-import {useApi} from "~~/composables/useApi";
+import auth from "~/middleware/auth";
 
 definePageMeta({
   middleware: auth
 })
 
 const route = useRoute()
+const toast = useToast()
 
 const form = reactive({
   name: '',
@@ -19,12 +17,11 @@ const form = reactive({
 })
 
 const isLoading = ref(false)
-const toast = useToast()
 
 async function onSubmit() {
   isLoading.value = true
   try {
-    const { data } = await useApi('/api/v1/repositories', {
+    await useApi('/api/v1/repositories', {
       method: 'POST',
       body: {
         name: form.name,
@@ -41,7 +38,8 @@ async function onSubmit() {
       color: 'success'
     })
 
-    await navigateTo(`/${form.name}`)
+    const query = form.directory_id ? { folder: form.directory_id } : {}
+    await navigateTo({ path: `/${form.name}`, query })
 
   } catch (error: any) {
     toast.add({
@@ -73,6 +71,7 @@ async function onSubmit() {
                 v-model="form.name"
                 placeholder="my-awesome-project"
                 icon="i-heroicons-book-open"
+                autofocus
             />
           </UFormField>
 

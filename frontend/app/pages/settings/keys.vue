@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { z } from 'zod'
-import { useApi } from "~~/composables/useApi";
+import { useApi } from "~/composables/useApi";
 import type {SSHKey} from "~~/types/models";
 
 // Fetch Keys
@@ -85,7 +85,7 @@ async function deleteKey(id: number) {
                     v-model="form.key"
                     placeholder="ssh-ed25519 AAAAC3Nz..."
                     :rows="5"
-                    class="font-mono text-xs"
+                    class="font-mono text-xs w-full"
                 />
               </UFormField>
 
