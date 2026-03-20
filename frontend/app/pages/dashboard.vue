@@ -15,13 +15,13 @@ const currentFolderId = computed(() => {
   return id ? parseInt(id as string) : null
 })
 
-// Fetch Data (Directories + Repositories)
+// Fetch Data
 const url = computed(() => currentFolderId.value
     ? `/api/v1/directories?parent_id=${currentFolderId.value}`
     : '/api/v1/directories'
 )
 
-const { data, refresh, error } = await useApi<any>(url, {
+const { data, refresh } = await useApi<any>(url, {
   watch: [currentFolderId]
 })
 
@@ -36,10 +36,7 @@ async function createFolder() {
   try {
     await useApi('/api/v1/directories', {
       method: 'POST',
-      body: {
-        name: newFolderName.value,
-        parent_id: currentFolderId.value
-      }
+      body: { name: newFolderName.value, parent_id: currentFolderId.value }
     })
     isCreateFolderOpen.value = false
     newFolderName.value = ''
@@ -51,27 +48,22 @@ async function createFolder() {
   }
 }
 
-// Navigation Helpers
+// Navigation
 const goUp = () => {
   if (!data.value?.current_dir) return
   const parentId = data.value.current_dir.parent_id
-  if (parentId) {
-    router.push({ query: { folder: parentId } })
-  } else {
-    router.push({ query: {} }) // Go to root
-  }
+  if (parentId) router.push({ query: { folder: parentId } })
+  else router.push({ query: {} })
 }
 
 const goToFolder = (id: number) => {
   router.push({ query: { folder: id } })
 }
-
-const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString()
 </script>
 
 <template>
   <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-    <!-- Navbar (Simplified) -->
+    <!-- Navbar -->
     <header class="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div class="flex items-center gap-4">
@@ -87,17 +79,10 @@ const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString()
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-      <!-- Toolbar & Breadcrumbs -->
+      <!-- Toolbar -->
       <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div class="flex items-center gap-2 text-lg">
-          <UButton
-              v-if="currentFolderId"
-              icon="i-heroicons-arrow-left"
-              variant="ghost"
-              color="neutral"
-              class="mr-1"
-              @click="goUp"
-          />
+          <UButton v-if="currentFolderId" icon="i-heroicons-arrow-left" variant="ghost" color="neutral" class="mr-1" @click="goUp"/>
           <UIcon name="i-heroicons-home" class="text-zinc-400" />
           <span class="text-zinc-400">/</span>
           <span v-if="!currentFolderId" class="font-bold">Home</span>
@@ -107,27 +92,14 @@ const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString()
         </div>
 
         <div class="flex gap-2">
-          <!-- Modified: UModal wraps the trigger button -->
-          <UModal v-model:open="isCreateFolderOpen">
-            <UButton icon="i-heroicons-folder-plus" color="white" label="New Folder" />
+          <!-- Button triggers the modal -->
+          <UButton
+              icon="i-heroicons-folder-plus"
+              color="neutral"
+              label="New Folder"
+              @click="isCreateFolderOpen = true"
+          />
 
-            <template #content>
-              <UCard>
-                <template #header>
-                  <h3 class="font-bold">Create New Folder</h3>
-                </template>
-                <form @submit.prevent="createFolder">
-                  <UInput v-model="newFolderName" placeholder="Folder Name" autofocus class="mb-4" />
-                  <div class="flex justify-end gap-2">
-                    <UButton color="neutral" variant="ghost" @click="isCreateFolderOpen = false">Cancel</UButton>
-                    <UButton type="submit" :loading="isCreating" :disabled="!newFolderName">Create</UButton>
-                  </div>
-                </form>
-              </UCard>
-            </template>
-          </UModal>
-
-          <!-- Pass current folder to New Repo page -->
           <UButton
               :to="currentFolderId ? `/new?folder=${currentFolderId}` : '/new'"
               icon="i-heroicons-plus"
@@ -138,47 +110,73 @@ const formatDate = (dateStr: string) => new Date(dateStr).toLocaleDateString()
         </div>
       </div>
 
-      <!-- Content Grid -->
-      <div v-if="data" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <!-- LIST VIEW -->
+      <UCard v-if="data" class="overflow-hidden p-0">
+        <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
 
-        <!-- Folders -->
-        <div
-            v-for="dir in data.directories"
-            :key="'d'+dir.id"
-            @click="goToFolder(dir.id)"
-            class="bg-white dark:bg-zinc-900 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-blue-400 cursor-pointer flex items-center gap-3 transition-colors"
-        >
-          <UIcon name="i-heroicons-folder" class="w-8 h-8 text-blue-400" />
-          <span class="font-medium truncate">{{ dir.name }}</span>
-        </div>
-
-        <!-- Repositories -->
-        <NuxtLink
-            v-for="repo in data.repositories"
-            :key="'r'+repo.id"
-            :to="`/${repo.name}`"
-            class="block"
-        >
-          <div class="bg-white dark:bg-zinc-900 p-4 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-primary-500 h-full flex flex-col transition-colors">
-            <div class="flex items-start justify-between mb-2">
-              <div class="flex items-center gap-2">
-                <UIcon name="i-heroicons-book-open" class="text-zinc-500" />
-                <span class="font-bold truncate">{{ repo.name }}</span>
-              </div>
-              <UIcon v-if="repo.is_private" name="i-heroicons-lock-closed" class="w-4 h-4 text-zinc-400" />
-            </div>
-            <p class="text-xs text-zinc-500 line-clamp-2">{{ repo.description || 'No description' }}</p>
+          <!-- Empty State -->
+          <div v-if="data.directories.length === 0 && data.repositories.length === 0" class="p-8 text-center text-zinc-500">
+            This folder is empty.
           </div>
-        </NuxtLink>
 
-      </div>
+          <!-- Directories -->
+          <div
+              v-for="dir in data.directories"
+              :key="'d'+dir.id"
+              @click="goToFolder(dir.id)"
+              class="flex items-center justify-between p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group transition-colors"
+          >
+            <div class="flex items-center gap-3">
+              <UIcon name="i-heroicons-folder" class="w-5 h-5 text-blue-400" />
+              <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500 group-hover:underline">
+                {{ dir.name }}
+              </span>
+            </div>
+            <UIcon name="i-heroicons-chevron-right" class="w-4 h-4 text-zinc-300" />
+          </div>
 
-      <!-- Empty State -->
-      <div v-if="data && data.directories.length === 0 && data.repositories.length === 0" class="text-center py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl">
-        <UIcon name="i-heroicons-folder-open" class="w-12 h-12 text-zinc-300 mx-auto mb-2" />
-        <p class="text-zinc-500">This folder is empty.</p>
-      </div>
+          <!-- Repositories -->
+          <NuxtLink
+              v-for="repo in data.repositories"
+              :key="'r'+repo.id"
+              :to="`/${repo.name}`"
+              class="flex items-center justify-between p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group transition-colors"
+          >
+            <div class="flex items-center gap-3">
+              <UIcon name="i-heroicons-book-open" class="w-5 h-5 text-zinc-400" />
+              <div class="flex flex-col">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-bold text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500 group-hover:underline">
+                    {{ repo.name }}
+                  </span>
+                  <UIcon v-if="repo.is_private" name="i-heroicons-lock-closed" class="w-3 h-3 text-zinc-400" />
+                </div>
+                <span v-if="repo.description" class="text-xs text-zinc-400 line-clamp-1">{{ repo.description }}</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-4 text-xs text-zinc-400">
+              <span>Updated recently</span>
+            </div>
+          </NuxtLink>
 
+        </div>
+      </UCard>
     </main>
+
+    <!-- Modal Component (Nuxt UI v3 Syntax: v-model:open) -->
+    <UModal v-model:open="isCreateFolderOpen" title="Create New Folder">
+      <template #body>
+        <form @submit.prevent="createFolder" class="space-y-4">
+          <UFormField label="Folder Name">
+            <UInput v-model="newFolderName" placeholder="e.g. My Projects" autofocus />
+          </UFormField>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <UButton color="neutral" variant="ghost" @click="isCreateFolderOpen = false">Cancel</UButton>
+            <UButton type="submit" :loading="isCreating" :disabled="!newFolderName">Create</UButton>
+          </div>
+        </form>
+      </template>
+    </UModal>
   </div>
 </template>
