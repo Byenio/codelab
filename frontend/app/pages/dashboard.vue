@@ -110,7 +110,7 @@ const goToFolder = (id: number) => {
             class="flex items-center justify-between p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group transition-colors"
         >
           <div class="flex items-center gap-3">
-            <UIcon name="i-heroicons-folder" class="w-5 h-5 text-blue-400" />
+            <UIcon name="i-heroicons-folder" class="w-5 h-5 text-primary-400" />
             <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500 group-hover:underline">
                 {{ dir.name }}
               </span>
@@ -129,7 +129,7 @@ const goToFolder = (id: number) => {
             <UIcon name="i-heroicons-book-open" class="w-5 h-5 text-zinc-400" />
             <div class="flex flex-col">
               <div class="flex items-center gap-2">
-                  <span class="text-sm font-bold text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500 group-hover:underline">
+                  <span class="text-sm font-bold text-zinc-700 dark:text-zinc-200 group-hover:text-primary-400 group-hover:underline">
                     {{ repo.name }}
                   </span>
                 <UIcon v-if="repo.is_private" name="i-heroicons-lock-closed" class="w-3 h-3 text-zinc-400" />

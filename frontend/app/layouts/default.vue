@@ -17,7 +17,7 @@ const handleLogout = async () => {
           <NuxtLink to="/dashboard" class="text-xl font-bold text-primary-500">CodeLab</NuxtLink>
           <nav class="flex gap-4 text-sm font-medium">
             <NuxtLink to="/dashboard" class="text-zinc-900 dark:text-white hover:text-primary-500">Dashboard</NuxtLink>
-            <NuxtLink to="/settings/keys" class="text-zinc-500 hover:text-zinc-900 dark:hover:text-white">Settings</NuxtLink>
+            <NuxtLink to="/settings" class="text-zinc-500 hover:text-zinc-900 dark:hover:text-white">Settings</NuxtLink>
           </nav>
         </div>
 
