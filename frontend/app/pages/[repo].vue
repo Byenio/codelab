@@ -5,7 +5,11 @@ import type { FileEntry, Repository } from "~~/types/models";
 const route = useRoute()
 const router = useRouter()
 
-const repoName = computed(() => route.params.repo as string)
+const repoName = computed(() => {
+  const r = route.params.repo
+  if (!r || r === 'null' || r === 'undefined') return ''
+  return Array.isArray(r) ? r[0] : r as string
+})
 
 const currentDirectoryId = computed(() => (route.query.folder ? parseInt(route.query.folder as string) : null))
 const currentBranch = computed(() => (route.query.branch as string) || 'master')
@@ -21,7 +25,8 @@ const apiQueryParams = computed(() => {
 
 const repoUrl = computed(() => repoName.value ? `/api/v1/repositories/${repoName.value}` : null)
 const { data: repo } = await useApi<Repository>(repoUrl, {
-  query: computed(() => currentDirectoryId.value ? { directory_id: currentDirectoryId.value } : {})
+  query: computed(() => currentDirectoryId.value ? { directory_id: currentDirectoryId.value } : {}),
+  watch: [repoUrl, currentDirectoryId]
 })
 
 const treeUrl = computed(() => {
@@ -33,7 +38,8 @@ const { data: files, pending: loadingFiles } = useApi<FileEntry[]>(
     treeUrl,
     {
       query: apiQueryParams,
-      watch: [currentBranch, currentPath, currentDirectoryId]
+      watch: [treeUrl, currentBranch, currentPath, currentDirectoryId],
+      key: `tree-${route.fullPath}`
     }
 )
 
@@ -46,7 +52,8 @@ const { data: fileContent, pending: loadingBlob } = useApi<{content: string}>(
     blobUrl,
     {
       query: apiQueryParams,
-      watch: [currentBranch, currentPath, currentDirectoryId]
+      watch: [blobUrl, currentBranch, currentPath, currentDirectoryId],
+      key: `blob-${route.fullPath}`
     }
 )
 
@@ -80,18 +87,26 @@ const { data: readmeContent } = useApi<{content: string}>(
         }
         return params
       }),
-      watch: [readmeUrl]
+      watch: [readmeUrl, readmePath, currentBranch, currentDirectoryId]
     }
 )
 
 const navigateToItem = (item: FileEntry) => {
   const newPath = currentPath.value ? `${currentPath.value}/${item.name}` : item.name
 
+  const query: any = { ...route.query, path: newPath, type: '' }
+
   if (item.is_directory) {
-    router.push({ query: { ...route.query, path: newPath, type: 'tree' } })
+    query.type = 'tree'
   } else {
-    router.push({ query: { ...route.query, path: newPath, type: 'blob' } })
+    query.type = 'blob'
   }
+
+  router.push({
+    name: 'repo',
+    params: { repo: repoName.value },
+    query
+  })
 }
 
 const goUp = () => {
@@ -99,8 +114,16 @@ const goUp = () => {
   const segments = currentPath.value.split('/')
   segments.pop()
   const newPath = segments.join('/')
-  router.push({ query: { ...route.query, path: newPath, type: 'tree' } })
+
+  const query = { ...route.query, path: newPath, type: 'tree' }
+
+  router.push({
+    name: 'repo',
+    params: { repo: repoName.value },
+    query
+  })
 }
+
 
 const iconMap: Record<string, string> = {
   'README.md': 'i-heroicons-document-text',
@@ -118,9 +141,18 @@ const getFileIcon = (file: FileEntry) => {
     <!-- Repo Header (Breadcrumbs/Title) -->
     <div class="flex items-center gap-2 text-lg mb-6 border-b border-zinc-200 dark:border-zinc-800 pb-4">
       <UIcon name="i-heroicons-book-open" class="text-zinc-500" />
-      <NuxtLink :to="`/${repoName}`" class="font-semibold text-primary-500 hover:underline">
+
+      <NuxtLink
+          :to="{
+          name: 'repo',
+          params: { repo: repoName },
+          query: currentDirectoryId ? { folder: currentDirectoryId } : {}
+        }"
+          class="font-semibold text-primary-500 hover:underline"
+      >
         {{ repoName }}
       </NuxtLink>
+
       <span v-if="currentPath" class="text-zinc-400">/</span>
       <span v-if="currentPath" class="text-zinc-600 dark:text-zinc-300">{{ currentPath }}</span>
       <UBadge v-if="repo?.is_private" color="neutral" size="xs">Private</UBadge>
