@@ -220,15 +220,24 @@ namespace codelab::api
     });
 
     // Get repository details
-    // GET /api/v1/repositories/<repo_name>
+    // GET /api/v1/repositories/<repo_name>?directory_id=1
     CROW_ROUTE(app, "/api/v1/repositories/<string>")
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, const std::string& repo_name){
       auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
       if (ctx.user_id == 0) return crow::response(401);
 
+      std::optional<int> dir_id = std::nullopt;
+      if (req.url_params.get("directory_id"))
+      {
+        try
+        {
+          dir_id = std::stoi(req.url_params.get("directory_id"));
+        } catch (...) {}
+      }
+
       dao::RepositoryDAO dao;
-      auto repo = dao.FindByName(ctx.user_id, std::nullopt, repo_name);
+      auto repo = dao.FindByName(ctx.user_id, dir_id, repo_name);
 
       if (!repo) {
           return crow::response(404, "Repository not found");
@@ -245,7 +254,7 @@ namespace codelab::api
     });
 
     // Get repository file tree
-    // GET /api/v1/repositories/<repo_name>/tree?branch=master&path=src/
+    // GET /api/v1/repositories/<repo_name>/tree?directory_id=1&branch=master&path=src/
     CROW_ROUTE(app, "/api/v1/repositories/<string>/tree")
     .methods(crow::HTTPMethod::Get)
     ([&app](const crow::request& req, const std::string& repo_name)
@@ -256,10 +265,17 @@ namespace codelab::api
       std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "master";
       std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
 
+      std::optional<int> dir_id = std::nullopt;
+      if (req.url_params.get("directory_id")) {
+        try {
+           dir_id = std::stoi(req.url_params.get("directory_id"));
+        } catch(...) {}
+      }
+
       std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
       services::RepoService service(storage_path);
 
-      auto files = service.GetFileTree(ctx.user_id, repo_name, branch, path);
+      auto files = service.GetFileTree(ctx.user_id, dir_id, repo_name, branch, path);
 
       crow::json::wvalue res = crow::json::wvalue::list();
       for (size_t i = 0; i < files.size(); i++)
@@ -274,7 +290,7 @@ namespace codelab::api
     });
 
     // Get file content
-    // GET /api/v1/repositories/<repo>/blob?path=src/main.cc
+    // GET /api/v1/repositories/<repo>/blob?directory_id=1&path=src/main.cc
     CROW_ROUTE(app, "/api/v1/repositories/<string>/blob")
     .methods(crow::HTTPMethod::GET)
     ([&app](const crow::request& req, std::string repo_name){
@@ -284,12 +300,19 @@ namespace codelab::api
       std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "master";
       std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
 
+      std::optional<int> dir_id = std::nullopt;
+      if (req.url_params.get("directory_id")) {
+        try {
+           dir_id = std::stoi(req.url_params.get("directory_id"));
+        } catch(...) {}
+      }
+
       if (path.empty()) return crow::response(400, "Path is required");
 
       std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
       services::RepoService service(storage_path);
 
-      auto content = service.GetFileContent(ctx.user_id, repo_name, branch, path);
+      auto content = service.GetFileContent(ctx.user_id, dir_id, repo_name, branch, path);
 
       if (content) {
           crow::json::wvalue res;

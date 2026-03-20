@@ -7,15 +7,23 @@ const router = useRouter()
 
 const repoName = computed(() => route.params.repo as string)
 
+const currentDirectoryId = computed(() => (route.query.folder ? parseInt(route.query.folder as string) : null))
 const currentBranch = computed(() => (route.query.branch as string) || 'master')
 const currentPath = computed(() => (route.query.path as string) || '')
 const viewType = computed(() => (route.query.type as string) || 'tree')
 
-// 1. Repo Info
-const repoUrl = computed(() => repoName.value ? `/api/v1/repositories/${repoName.value}` : null)
-const { data: repo } = await useApi<Repository>(repoUrl)
+const apiQueryParams = computed(() => {
+  const params: any = { branch: currentBranch.value, path: currentPath }
+  if (currentDirectoryId.value) params.directory_id = currentDirectoryId.value
 
-// 2. Tree Data
+  return params
+})
+
+const repoUrl = computed(() => repoName.value ? `/api/v1/repositories/${repoName.value}` : null)
+const { data: repo } = await useApi<Repository>(repoUrl, {
+  query: computed(() => currentDirectoryId.value ? { directory_id: currentDirectoryId } : {})
+})
+
 const treeUrl = computed(() => {
   if (!repoName.value || viewType.value !== 'tree') return null
   return `/api/v1/repositories/${repoName.value}/tree`
@@ -24,12 +32,11 @@ const treeUrl = computed(() => {
 const { data: files, pending: loadingFiles } = useApi<FileEntry[]>(
     treeUrl,
     {
-      query: { branch: currentBranch, path: currentPath },
-      watch: [currentBranch, currentPath]
+      query: apiQueryParams,
+      watch: [currentBranch, currentPath, currentDirectoryId]
     }
 )
 
-// 3. Blob Data
 const blobUrl = computed(() => {
   if (!repoName.value || viewType.value !== 'blob') return null
   return `/api/v1/repositories/${repoName.value}/blob`
@@ -38,12 +45,11 @@ const blobUrl = computed(() => {
 const { data: fileContent, pending: loadingBlob } = useApi<{content: string}>(
     blobUrl,
     {
-      query: { branch: currentBranch, path: currentPath },
-      watch: [currentBranch, currentPath]
+      query: apiQueryParams,
+      watch: [currentBranch, currentPath, currentDirectoryId]
     }
 )
 
-// 4. README Auto-Fetch Logic
 const hasReadme = computed(() => {
   if (!files.value) return null
   return files.value.find(f => f.name.toLowerCase() === 'readme.md')
@@ -64,14 +70,18 @@ const readmePath = computed(() => {
 const { data: readmeContent } = useApi<{content: string}>(
     readmeUrl,
     {
-      query: { branch: currentBranch, path: readmePath },
+      query: computed(() => ({
+        branch: currentBranch.value,
+        path: readmePath.value,
+        ...(currentDirectoryId.value ? { directory_id: currentDirectoryId } : {})
+      })),
       watch: [readmeUrl]
     }
 )
 
-// Navigation
 const navigateToItem = (item: FileEntry) => {
   const newPath = currentPath.value ? `${currentPath.value}/${item.name}` : item.name
+
   if (item.is_directory) {
     router.push({ query: { ...route.query, path: newPath, type: 'tree' } })
   } else {
