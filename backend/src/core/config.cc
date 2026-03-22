@@ -1,6 +1,7 @@
 #include "core/config.h"
 #include <fstream>
 #include <cstdlib>
+#include <iostream>
 
 namespace codelab::core
 {
@@ -31,13 +32,13 @@ namespace codelab::core
 
   std::string Config::GetString(const std::string &key, const std::string &default_val) const
   {
-    auto it = vars_.find(key);
-    if (it != vars_.end()) return it->second;
-
     if (const char* env_p = std::getenv(key.c_str()))
     {
       return std::string(env_p);
     }
+
+    auto it = vars_.find(key);
+    if (it != vars_.end()) return it->second;
 
     return default_val;
   }

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 #include <optional>
-
+#include <git2.h>
 #include "git_storage.h"
 #include "models/git.h"
 

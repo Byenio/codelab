@@ -182,7 +182,9 @@ namespace codelab::api
         dir_id = static_cast<int>(data["directory_id"].i());
       }
 
-      services::RepoService repo_service;
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
       auto result = repo_service.CreateRepository(user_id, dir_id, name, description, is_private, init_readme);
 
       if (result)
@@ -193,6 +195,131 @@ namespace codelab::api
         return crow::response(201, res);
       }
       return crow::response(500, "Failed to create repository");
+    });
+
+    // List user repositories
+    // GET /api/v1/user/repositories
+    CROW_ROUTE(app, "/api/v1/user/repositories")
+    .methods(crow::HTTPMethod::GET)
+    ([&app](const crow::request& req){
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      dao::RepositoryDAO dao;
+      auto repos = dao.ListByUser(ctx.user_id);
+
+      crow::json::wvalue res = crow::json::wvalue::list();
+      for (size_t i = 0; i < repos.size(); i++) {
+        res[i]["id"] = repos[i].id;
+        res[i]["name"] = repos[i].name;
+        res[i]["description"] = repos[i].description;
+        res[i]["is_private"] = repos[i].is_private;
+        res[i]["created_at"] = repos[i].created_at;
+      }
+      return crow::response(200, res);
+    });
+
+    // Get repository details
+    // GET /api/v1/repositories/<repo_name>?directory_id=1
+    CROW_ROUTE(app, "/api/v1/repositories/<string>")
+    .methods(crow::HTTPMethod::GET)
+    ([&app](const crow::request& req, const std::string& repo_name){
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      std::optional<int> dir_id = std::nullopt;
+      if (req.url_params.get("directory_id"))
+      {
+        try
+        {
+          dir_id = std::stoi(req.url_params.get("directory_id"));
+        } catch (...) {}
+      }
+
+      dao::RepositoryDAO dao;
+      auto repo = dao.FindByName(ctx.user_id, dir_id, repo_name);
+
+      if (!repo) {
+          return crow::response(404, "Repository not found");
+      }
+
+      crow::json::wvalue res;
+      res["id"] = repo->id;
+      res["name"] = repo->name;
+      res["description"] = repo->description;
+      res["is_private"] = repo->is_private;
+      res["created_at"] = repo->created_at;
+
+      return crow::response(200, res);
+    });
+
+    // Get repository file tree
+    // GET /api/v1/repositories/<repo_name>/tree?directory_id=1&branch=master&path=src/
+    CROW_ROUTE(app, "/api/v1/repositories/<string>/tree")
+    .methods(crow::HTTPMethod::Get)
+    ([&app](const crow::request& req, const std::string& repo_name)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "master";
+      std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
+
+      std::optional<int> dir_id = std::nullopt;
+      if (req.url_params.get("directory_id")) {
+        try {
+           dir_id = std::stoi(req.url_params.get("directory_id"));
+        } catch(...) {}
+      }
+
+      std::string storage_path = core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService service(storage_path);
+
+      auto files = service.GetFileTree(ctx.user_id, dir_id, repo_name, branch, path);
+
+      crow::json::wvalue res = crow::json::wvalue::list();
+      for (size_t i = 0; i < files.size(); i++)
+      {
+        res[i]["name"] = files[i].name;
+        res[i]["path"] = files[i].path;
+        res[i]["is_directory"] = files[i].is_directory;
+        res[i]["size"] = files[i].size;
+      }
+
+      return crow::response(200, res);
+    });
+
+    // Get file content
+    // GET /api/v1/repositories/<repo>/blob?directory_id=1&path=src/main.cc
+    CROW_ROUTE(app, "/api/v1/repositories/<string>/blob")
+    .methods(crow::HTTPMethod::GET)
+    ([&app](const crow::request& req, std::string repo_name){
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      std::string branch = req.url_params.get("branch") ? req.url_params.get("branch") : "master";
+      std::string path = req.url_params.get("path") ? req.url_params.get("path") : "";
+
+      std::optional<int> dir_id = std::nullopt;
+      if (req.url_params.get("directory_id")) {
+        try {
+           dir_id = std::stoi(req.url_params.get("directory_id"));
+        } catch(...) {}
+      }
+
+      if (path.empty()) return crow::response(400, "Path is required");
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService service(storage_path);
+
+      auto content = service.GetFileContent(ctx.user_id, dir_id, repo_name, branch, path);
+
+      if (content) {
+          crow::json::wvalue res;
+          res["content"] = *content;
+          return crow::response(200, res);
+      }
+      return crow::response(404, "File not found");
     });
 
     // endregion
