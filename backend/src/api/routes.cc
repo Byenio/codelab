@@ -30,6 +30,22 @@ namespace codelab::api
 
     // region --- LOGIN / REGISTER ---
 
+    // Verify token / Get current user
+    // GET /api/v1/me
+    CROW_ROUTE(app, "/api/v1/me")
+    .methods(crow::HTTPMethod::Get)
+    ([&app](const crow::request& req)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      crow::json::wvalue res;
+      res["id"] = ctx.user_id;
+      res["status"] = "authenticated";
+
+      return crow::response(200, res);
+    });
+
     // Register new user
     // Post /api/v1/register
     CROW_ROUTE(app, "/api/v1/register")
