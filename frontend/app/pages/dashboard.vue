@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import auth from "~/middleware/auth";
 import { useApi } from "~/composables/useApi";
+import authenticated from "~/middleware/authenticated";
 
 definePageMeta({
-  middleware: auth
+  middleware: authenticated
 })
 
 const route = useRoute()

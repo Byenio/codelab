@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import guest from "~/middleware/guest";
+import unauthenticated from "~/middleware/unauthenticated";
 
 definePageMeta({
-  middleware: guest
+  middleware: unauthenticated
 })
 
 const form = reactive({

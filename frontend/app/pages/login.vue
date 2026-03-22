@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import guest from "~/middleware/guest";
+import unauthenticated from "~/middleware/unauthenticated";
+import {navigateTo} from "nuxt/app";
 
 definePageMeta({
-  middleware: guest
+  middleware: unauthenticated
 })
 
 const form = reactive({
@@ -13,29 +14,30 @@ const form = reactive({
 const isLoading = ref(false)
 const toast = useToast()
 
+const { fetchUser, token } = useAuth()
+
 async function handleLogin() {
   isLoading.value = true
   try {
     const response: any = await $fetch('/api/v1/login', {
       method: 'POST',
-      body: {
-        username: form.username,
-        password: form.password
-      }
+      body: form
     })
 
-    const token = response.token
-    if (token) {
-      const cookie = useCookie('auth_token')
-      cookie.value = token
+    if (response.token) {
+      token.value = response.token
+      const user = await fetchUser(response.token)
 
-      toast.add({
-        title: 'Login Successful',
-        description: 'Welcome back to CodeLab!',
-        color: 'success'
-      })
-
-      await navigateTo('/dashboard')
+      if (user) {
+        toast.add({ title: 'Welcome!', color: 'success' })
+        await navigateTo('/dashboard')
+      } else {
+        toast.add({
+          title: 'Authentication Error',
+          description: 'The server rejected the new token. Check the console.',
+          color: 'error'
+        })
+      }
     }
   } catch (error: any) {
     toast.add({
