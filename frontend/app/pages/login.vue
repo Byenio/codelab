@@ -3,7 +3,8 @@ import unauthenticated from "~/middleware/unauthenticated";
 import {navigateTo} from "nuxt/app";
 
 definePageMeta({
-  middleware: unauthenticated
+  middleware: unauthenticated,
+  layout: 'blank'
 })
 
 const form = reactive({
@@ -30,7 +31,7 @@ async function handleLogin() {
 
       if (user) {
         toast.add({ title: 'Welcome!', color: 'success' })
-        await navigateTo('/dashboard')
+        await navigateTo('/')
       } else {
         toast.add({
           title: 'Authentication Error',

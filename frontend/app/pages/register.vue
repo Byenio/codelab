@@ -2,7 +2,8 @@
 import unauthenticated from "~/middleware/unauthenticated";
 
 definePageMeta({
-  middleware: unauthenticated
+  middleware: unauthenticated,
+  layout: 'blank'
 })
 
 const form = reactive({
