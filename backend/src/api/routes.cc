@@ -91,6 +91,100 @@ namespace codelab::api
 
     // region --- PRIVATE ROUTES ---
 
+    // region --- FILESYSTEM ---
+
+    // Resolve path to Directory or Repository
+    // GET /api/v1/fs/resolve?path={project_path}
+    CROW_ROUTE(app, "/api/v1/fs/resolve")
+    .methods(crow::HTTPMethod::Get)
+    ([&app](const crow::request& req)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+
+      std::string path_str = "";
+      if (req.url_params.get("path")) path_str = req.url_params.get("path");
+
+      // DEBUG: Print what we received
+      std::cout << "[DEBUG] Resolving path: '" << path_str << "'" << std::endl;
+
+      std::vector<std::string> segments;
+      std::stringstream ss(path_str);
+      std::string segment;
+      while (std::getline(ss, segment, '/')) {
+        if (!segment.empty()) segments.push_back(segment);
+      }
+
+      dao::DirectoryDAO dir_dao;
+      dao::RepositoryDAO repo_dao;
+
+      std::optional<int> current_parent_id = std::nullopt;
+      bool is_directory = true;
+      int resolved_id = 0;
+
+      // 1. Traverse path
+      for (size_t i = 0; i < segments.size(); i++) {
+        const auto& name = segments[i];
+        bool is_last = (i == segments.size() - 1);
+
+        auto dir = dir_dao.FindByName(ctx.user_id, current_parent_id, name);
+        if (dir) {
+          current_parent_id = dir->id;
+          if (is_last) resolved_id = dir->id;
+          continue;
+        }
+
+        if (is_last) {
+           auto repo = repo_dao.FindByName(ctx.user_id, current_parent_id, name);
+           if (repo) {
+             resolved_id = repo->id;
+             is_directory = false;
+             break;
+           }
+        }
+
+        return crow::response(404, "Path not found");
+      }
+
+      crow::json::wvalue res;
+      if (is_directory) {
+        res["type"] = "directory";
+        if (current_parent_id.has_value()) res["directory_id"] = current_parent_id.value();
+
+        auto dirs = dir_dao.ListByParent(ctx.user_id, current_parent_id);
+        auto repos = repo_dao.ListByDirectory(ctx.user_id, current_parent_id);
+
+        res["directories"] = crow::json::wvalue::list();
+        for(size_t i=0; i<dirs.size(); i++) {
+           res["directories"][i]["id"] = dirs[i].id;
+           res["directories"][i]["name"] = dirs[i].name;
+           res["directories"][i]["type"] = "directory";
+        }
+
+        res["repositories"] = crow::json::wvalue::list();
+        for(size_t i=0; i<repos.size(); i++) {
+           res["repositories"][i]["id"] = repos[i].id;
+           res["repositories"][i]["name"] = repos[i].name;
+           res["repositories"][i]["type"] = "repository";
+           res["repositories"][i]["is_private"] = repos[i].is_private;
+        }
+      } else {
+        res["type"] = "repository";
+        if (current_parent_id.has_value()) res["directory_id"] = current_parent_id.value();
+
+        auto repo = repo_dao.FindById(resolved_id);
+        if (repo) {
+            res["repository"]["id"] = repo->id;
+            res["repository"]["name"] = repo->name;
+            res["repository"]["description"] = repo->description;
+            res["repository"]["is_private"] = repo->is_private;
+        }
+      }
+      return crow::response(200, res);
+    });
+
+    // endregion
+
     // region --- DIRECTORY ---
 
     // List contents of a folder
