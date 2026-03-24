@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import unauthenticated from "~/middleware/unauthenticated";
+import unauthenticated from '~/middleware/unauthenticated'
 
 definePageMeta({
   middleware: unauthenticated,
@@ -47,25 +47,62 @@ async function handleRegister() {
     <UCard class="w-full max-w-md">
       <template #header>
         <div class="flex items-center gap-2">
-          <UIcon name="i-heroicons-user-plus" class="text-primary-500 w-8 h-8" />
-          <h1 class="text-xl font-bold">Create Account</h1>
+          <UIcon
+            name="i-heroicons-user-plus"
+            class="text-primary-500 w-8 h-8"
+          />
+          <h1 class="text-xl font-bold">
+            Create Account
+          </h1>
         </div>
       </template>
 
-      <form @submit.prevent="handleRegister" method="POST" class="space-y-4">
-        <UFormField label="Username" name="username">
-          <UInput v-model="form.username" icon="i-heroicons-user" class="w-full" />
+      <form
+        method="POST"
+        class="space-y-4"
+        @submit.prevent="handleRegister"
+      >
+        <UFormField
+          label="Username"
+          name="username"
+        >
+          <UInput
+            v-model="form.username"
+            icon="i-heroicons-user"
+            class="w-full"
+          />
         </UFormField>
 
-        <UFormField label="Email" name="email">
-          <UInput v-model="form.email" type="email" icon="i-heroicons-envelope" class="w-full" />
+        <UFormField
+          label="Email"
+          name="email"
+        >
+          <UInput
+            v-model="form.email"
+            type="email"
+            icon="i-heroicons-envelope"
+            class="w-full"
+          />
         </UFormField>
 
-        <UFormField label="Password" name="password">
-          <UInput v-model="form.password" type="password" icon="i-heroicons-lock-closed" class="w-full" />
+        <UFormField
+          label="Password"
+          name="password"
+        >
+          <UInput
+            v-model="form.password"
+            type="password"
+            icon="i-heroicons-lock-closed"
+            class="w-full"
+          />
         </UFormField>
 
-        <UButton type="submit" block :loading="isLoading" class="w-full">
+        <UButton
+          type="submit"
+          block
+          :loading="isLoading"
+          class="w-full"
+        >
           Create Account
         </UButton>
       </form>
@@ -73,7 +110,10 @@ async function handleRegister() {
       <template #footer>
         <p class="text-sm text-center text-zinc-500">
           Already have an account?
-          <NuxtLink to="/login" class="text-primary-500 hover:underline">
+          <NuxtLink
+            to="/login"
+            class="text-primary-500 hover:underline"
+          >
             Sign in
           </NuxtLink>
         </p>

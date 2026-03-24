@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useApi } from "~/composables/useApi";
-import authenticated from "~/middleware/authenticated";
+import { useApi } from '~/composables/useApi'
+import authenticated from '~/middleware/authenticated'
 // Import the new component
-import RepositoryView from "~/components/RepositoryView.vue";
+import RepositoryView from '~/components/RepositoryView.vue'
 
 definePageMeta({
   middleware: authenticated
@@ -72,13 +72,13 @@ const repoDirId = computed(() => data.value?.directory_id)
 
 const slugify = (text: string) => {
   return text
-      .toString()
-      .toLowerCase()
-      .replace(/\s+/g, '-')           // Replace spaces with -
-      .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
-      .replace(/\-\-+/g, '-')         // Replace multiple - with single -
-      .replace(/^-+/, '')             // Trim - from start
-      .replace(/-+$/, '');            // Trim - from end
+    .toString()
+    .toLowerCase()
+    .replace(/\s+/g, '-') // Replace spaces with -
+    .replace(/[^\w\-]+/g, '') // Remove all non-word chars
+    .replace(/\-\-+/g, '-') // Replace multiple - with single -
+    .replace(/^-+/, '') // Trim - from start
+    .replace(/-+$/, '') // Trim - from end
 }
 
 // --- Navigation ---
@@ -105,26 +105,53 @@ const breadcrumbs = computed(() => {
 <template>
   <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950">
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
       <!-- Breadcrumbs Header -->
       <div class="flex items-center gap-2 text-sm text-zinc-500 mb-6">
-        <NuxtLink to="/" class="hover:text-primary-500 flex items-center gap-1">
-          <UIcon name="i-heroicons-home" class="w-4 h-4"/>
+        <NuxtLink
+          to="/"
+          class="hover:text-primary-500 flex items-center gap-1"
+        >
+          <UIcon
+            name="i-heroicons-home"
+            class="w-4 h-4"
+          />
         </NuxtLink>
-        <template v-for="crumb in breadcrumbs" :key="crumb.path">
+        <template
+          v-for="crumb in breadcrumbs"
+          :key="crumb.path"
+        >
           <span class="text-zinc-300">/</span>
-          <NuxtLink :to="crumb.path" class="hover:text-primary-500 font-medium text-zinc-700 dark:text-zinc-200">
+          <NuxtLink
+            :to="crumb.path"
+            class="hover:text-primary-500 font-medium text-zinc-700 dark:text-zinc-200"
+          >
             {{ crumb.name }}
           </NuxtLink>
         </template>
       </div>
 
       <!-- ERROR STATE -->
-      <div v-if="error" class="text-center py-12">
-        <UIcon name="i-heroicons-exclamation-triangle" class="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-        <h3 class="text-lg font-medium text-zinc-900 dark:text-white">Path not found</h3>
-        <p class="text-zinc-500 mt-2">The directory or repository you are looking for does not exist.</p>
-        <UButton to="/" variant="ghost" class="mt-4">Go Home</UButton>
+      <div
+        v-if="error"
+        class="text-center py-12"
+      >
+        <UIcon
+          name="i-heroicons-exclamation-triangle"
+          class="w-12 h-12 text-zinc-300 mx-auto mb-4"
+        />
+        <h3 class="text-lg font-medium text-zinc-900 dark:text-white">
+          Path not found
+        </h3>
+        <p class="text-zinc-500 mt-2">
+          The directory or repository you are looking for does not exist.
+        </p>
+        <UButton
+          to="/"
+          variant="ghost"
+          class="mt-4"
+        >
+          Go Home
+        </UButton>
       </div>
 
       <!-- DIRECTORY VIEW -->
@@ -135,16 +162,16 @@ const breadcrumbs = computed(() => {
           </h1>
           <div class="flex gap-2">
             <UButton
-                icon="i-heroicons-folder-plus"
-                color="neutral"
-                label="New Folder"
-                @click="isCreateFolderOpen = true"
+              icon="i-heroicons-folder-plus"
+              color="neutral"
+              label="New Folder"
+              @click="isCreateFolderOpen = true"
             />
 
             <UButton
-                :to="currentFolderId ? `/new?folder=${currentFolderId}` : '/new'"
-                icon="i-heroicons-plus"
-                color="primary"
+              :to="currentFolderId ? `/new?folder=${currentFolderId}` : '/new'"
+              icon="i-heroicons-plus"
+              color="primary"
             >
               New Repository
             </UButton>
@@ -153,31 +180,44 @@ const breadcrumbs = computed(() => {
 
         <UCard class="p-0 overflow-hidden">
           <div class="divide-y divide-zinc-100 dark:divide-zinc-800">
-            <div v-if="data.directories.length === 0 && data.repositories.length === 0" class="p-8 text-center text-zinc-500">
+            <div
+              v-if="data.directories.length === 0 && data.repositories.length === 0"
+              class="p-8 text-center text-zinc-500"
+            >
               Empty directory.
             </div>
 
             <!-- Directories -->
             <div
-                v-for="dir in data.directories"
-                :key="'d'+dir.id"
-                @click="navigateToItem(dir)"
-                class="flex items-center gap-3 p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group"
+              v-for="dir in data.directories"
+              :key="'d'+dir.id"
+              class="flex items-center gap-3 p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group"
+              @click="navigateToItem(dir)"
             >
-              <UIcon name="i-heroicons-folder" class="w-5 h-5 text-primary-400" />
+              <UIcon
+                name="i-heroicons-folder"
+                class="w-5 h-5 text-primary-400"
+              />
               <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500">{{ dir.name }}</span>
             </div>
 
             <!-- Repositories -->
             <div
-                v-for="repo in data.repositories"
-                :key="'r'+repo.id"
-                @click="navigateToItem(repo)"
-                class="flex items-center gap-3 p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group"
+              v-for="repo in data.repositories"
+              :key="'r'+repo.id"
+              class="flex items-center gap-3 p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group"
+              @click="navigateToItem(repo)"
             >
-              <UIcon name="i-heroicons-book-open" class="w-5 h-5 text-zinc-400" />
+              <UIcon
+                name="i-heroicons-book-open"
+                class="w-5 h-5 text-zinc-400"
+              />
               <span class="text-sm font-bold text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500">{{ repo.name }}</span>
-              <UIcon v-if="repo.is_private" name="i-heroicons-lock-closed" class="w-3 h-3 text-zinc-400" />
+              <UIcon
+                v-if="repo.is_private"
+                name="i-heroicons-lock-closed"
+                class="w-3 h-3 text-zinc-400"
+              />
             </div>
           </div>
         </UCard>
@@ -186,22 +226,44 @@ const breadcrumbs = computed(() => {
       <!-- REPOSITORY VIEW -->
       <!-- We render the component here if the type is repository -->
       <RepositoryView
-          v-else-if="isRepository && repoData"
-          :repo="repoData"
-          :directory-id="repoDirId"
+        v-else-if="isRepository && repoData"
+        :repo="repoData"
+        :directory-id="repoDirId"
       />
 
       <!-- Modal -->
-      <UModal v-model:open="isCreateFolderOpen" title="Create New Folder">
+      <UModal
+        v-model:open="isCreateFolderOpen"
+        title="Create New Folder"
+      >
         <template #body>
-          <form @submit.prevent="createFolder" class="space-y-4">
+          <form
+            class="space-y-4"
+            @submit.prevent="createFolder"
+          >
             <UFormField label="Folder Name">
-              <UInput v-model="newFolderName" placeholder="e.g. My Projects" autofocus />
+              <UInput
+                v-model="newFolderName"
+                placeholder="e.g. My Projects"
+                autofocus
+              />
             </UFormField>
 
             <div class="flex justify-end gap-2 pt-2">
-              <UButton color="neutral" variant="ghost" @click="isCreateFolderOpen = false">Cancel</UButton>
-              <UButton type="submit" :loading="isCreating" :disabled="!newFolderName">Create</UButton>
+              <UButton
+                color="neutral"
+                variant="ghost"
+                @click="isCreateFolderOpen = false"
+              >
+                Cancel
+              </UButton>
+              <UButton
+                type="submit"
+                :loading="isCreating"
+                :disabled="!newFolderName"
+              >
+                Create
+              </UButton>
             </div>
           </form>
         </template>

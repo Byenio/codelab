@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import authenticated from "~/middleware/authenticated";
+import authenticated from '~/middleware/authenticated'
 
 definePageMeta({
   middleware: authenticated
@@ -40,7 +40,6 @@ async function onSubmit() {
 
     const query = form.directory_id ? { folder: form.directory_id } : {}
     await navigateTo({ path: `/${form.name}`, query })
-
   } catch (error: any) {
     toast.add({
       title: 'Creation Failed',
@@ -56,35 +55,47 @@ async function onSubmit() {
 <template>
   <div class="min-h-screen bg-zinc-50 dark:bg-zinc-950 py-12">
     <UContainer class="max-w-2xl">
-
       <div class="mb-8">
-        <h1 class="text-3xl font-bold text-zinc-900 dark:text-white">Create a new repository</h1>
-        <p class="text-zinc-500 mt-2">A repository contains all project files, including the revision history.</p>
+        <h1 class="text-3xl font-bold text-zinc-900 dark:text-white">
+          Create a new repository
+        </h1>
+        <p class="text-zinc-500 mt-2">
+          A repository contains all project files, including the revision history.
+        </p>
       </div>
 
       <UCard>
-        <form @submit.prevent="onSubmit" class="space-y-6">
-
+        <form
+          class="space-y-6"
+          @submit.prevent="onSubmit"
+        >
           <!-- Repository Name -->
-          <UFormField label="Repository Name" name="name" help="Great repository names are short and memorable.">
+          <UFormField
+            label="Repository Name"
+            name="name"
+            help="Great repository names are short and memorable."
+          >
             <UInput
-                v-model="form.name"
-                placeholder="my-awesome-project"
-                icon="i-heroicons-book-open"
-                autofocus
+              v-model="form.name"
+              placeholder="my-awesome-project"
+              icon="i-heroicons-book-open"
+              autofocus
             />
           </UFormField>
 
           <!-- Description -->
-          <UFormField label="Description (Optional)" name="description">
+          <UFormField
+            label="Description (Optional)"
+            name="description"
+          >
             <UTextarea
-                v-model="form.description"
-                placeholder="What is this project about?"
-                autoresize
+              v-model="form.description"
+              placeholder="What is this project about?"
+              autoresize
             />
           </UFormField>
 
-          <hr class="border-zinc-200 dark:border-zinc-800" />
+          <hr class="border-zinc-200 dark:border-zinc-800">
 
           <!-- Visibility Options -->
           <div class="space-y-3">
@@ -92,64 +103,72 @@ async function onSubmit() {
 
             <!-- Public Option -->
             <div
-                class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors"
-                :class="!form.is_private ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20' : 'border-zinc-200 dark:border-zinc-800'"
-                @click="form.is_private = false"
+              class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors"
+              :class="!form.is_private ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20' : 'border-zinc-200 dark:border-zinc-800'"
+              @click="form.is_private = false"
             >
-              <URadio v-model="form.is_private" :value="false" />
+              <URadio
+                v-model="form.is_private"
+                :value="false"
+              />
               <div>
                 <div class="flex items-center gap-2 font-medium">
                   <UIcon name="i-heroicons-globe-alt" />
                   Public
                 </div>
-                <p class="text-sm text-zinc-500">Anyone on the internet can see this repository.</p>
+                <p class="text-sm text-zinc-500">
+                  Anyone on the internet can see this repository.
+                </p>
               </div>
             </div>
 
             <!-- Private Option -->
             <div
-                class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors"
-                :class="form.is_private ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20' : 'border-zinc-200 dark:border-zinc-800'"
-                @click="form.is_private = true"
+              class="flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors"
+              :class="form.is_private ? 'border-primary-500 bg-primary-50 dark:bg-primary-950/20' : 'border-zinc-200 dark:border-zinc-800'"
+              @click="form.is_private = true"
             >
-              <URadio v-model="form.is_private" :value="true" />
+              <URadio
+                v-model="form.is_private"
+                :value="true"
+              />
               <div>
                 <div class="flex items-center gap-2 font-medium">
                   <UIcon name="i-heroicons-lock-closed" />
                   Private
                 </div>
-                <p class="text-sm text-zinc-500">You choose who can see and commit to this repository.</p>
+                <p class="text-sm text-zinc-500">
+                  You choose who can see and commit to this repository.
+                </p>
               </div>
             </div>
           </div>
 
-          <hr class="border-zinc-200 dark:border-zinc-800" />
+          <hr class="border-zinc-200 dark:border-zinc-800">
 
           <!-- Initialization -->
           <UFormField>
             <UCheckbox
-                v-model="form.auto_init"
-                label="Initialize this repository with a README"
-                help="This will let you immediately clone the repository to your computer."
+              v-model="form.auto_init"
+              label="Initialize this repository with a README"
+              help="This will let you immediately clone the repository to your computer."
             />
           </UFormField>
 
           <!-- Submit Button -->
           <div class="pt-4">
             <UButton
-                type="submit"
-                size="lg"
-                block
-                :loading="isLoading"
-                :disabled="!form.name"
+              type="submit"
+              size="lg"
+              block
+              :loading="isLoading"
+              :disabled="!form.name"
             >
               Create Repository
             </UButton>
           </div>
-
         </form>
       </UCard>
-
     </UContainer>
   </div>
 </template>
