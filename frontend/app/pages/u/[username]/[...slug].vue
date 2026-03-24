@@ -1,31 +1,34 @@
 <script setup lang="ts">
 import { useApi } from '~/composables/useApi'
 import authenticated from '~/middleware/authenticated'
-// Import the new component
 import RepositoryView from '~/components/RepositoryView.vue'
 
 definePageMeta({
   middleware: authenticated
 })
 
+const { user } = useAuth()
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 
-// Reconstruct path from slug array
+const username = computed(() => route.params.username as string)
+
 const currentPath = computed(() => {
   const slug = route.params.slug
-  if (!slug) return ''
-  return Array.isArray(slug) ? slug.join('/') : slug
+  if (!slug || slug === 'null' || slug === 'undefined') return ''
+  const joined = Array.isArray(slug) ? slug.join('/') : String(slug)
+  return (joined === 'null' || joined === 'undefined') ? '' : joined
 })
 
-// Resolve the path (Backend returns either directory contents OR repository metadata)
 const { data, error, refresh } = await useApi<any>('/api/v1/fs/resolve', {
-  query: computed(() => ({ path: currentPath.value })),
+  query: computed(() => ({
+    username: username.value,
+    path: currentPath.value
+  })),
   watch: [currentPath]
 })
 
-// 3. New Folder Logic
 const isCreateFolderOpen = ref(false)
 const newFolderName = ref('')
 const isCreating = ref(false)
@@ -37,7 +40,6 @@ watch(newFolderName, (newValue) => {
   }
 })
 
-// Get the ID of the directory we are currently viewing from the resolve response
 const currentFolderId = computed(() => data.value?.directory_id || null)
 
 async function createFolder() {
@@ -48,7 +50,7 @@ async function createFolder() {
       method: 'POST',
       body: {
         name: newFolderName.value,
-        parent_id: currentFolderId.value // Pass the current directory ID as parent
+        parent_id: currentFolderId.value
       }
     })
     isCreateFolderOpen.value = false
@@ -62,7 +64,6 @@ async function createFolder() {
   }
 }
 
-// --- Type Guards ---
 const isDirectory = computed(() => !data.value || data.value.type === 'directory')
 const isRepository = computed(() => data.value && data.value.type === 'repository')
 const isFile = computed(() => data.value && data.value.type === 'file')
@@ -74,29 +75,31 @@ const slugify = (text: string) => {
   return text
     .toString()
     .toLowerCase()
-    .replace(/\s+/g, '-') // Replace spaces with -
-    .replace(/[^\w\-]+/g, '') // Remove all non-word chars
-    .replace(/\-\-+/g, '-') // Replace multiple - with single -
-    .replace(/^-+/, '') // Trim - from start
-    .replace(/-+$/, '') // Trim - from end
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/\-\-+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '')
 }
 
-// --- Navigation ---
 const navigateToItem = (item: any) => {
   const slugName = slugify(item.name)
   const newPath = currentPath.value ? `${currentPath.value}/${slugName}` : slugName
-  router.push('/' + newPath)
+  router.push(`/u/${username.value}/${newPath}`)
 }
 
-// --- Breadcrumbs ---
 const breadcrumbs = computed(() => {
-  if (!currentPath.value) return []
+  const crumbs = [{ name: username.value, path: `/u/${username.value}`}]
+  if (!currentPath.value) return crumbs
+
   const segments = currentPath.value.split('/')
-  const crumbs = []
   let accum = ''
   for (const seg of segments) {
     accum = accum ? `${accum}/${seg}` : seg
-    crumbs.push({ name: seg, path: '/' + accum })
+    crumbs.push({
+      name: seg,
+      path: `/u/${username.value}/${accum}`
+    })
   }
   return crumbs
 })
@@ -108,11 +111,11 @@ const breadcrumbs = computed(() => {
       <!-- Breadcrumbs Header -->
       <div class="flex items-center gap-2 text-sm text-zinc-500 mb-6">
         <NuxtLink
-          to="/"
+          :to="username ? `/u/${username}` : `/u/${user.value.username}`"
           class="hover:text-primary-500 flex items-center gap-1"
         >
           <UIcon
-            name="i-heroicons-home"
+            name="i-heroicons-folder"
             class="w-4 h-4"
           />
         </NuxtLink>
@@ -169,7 +172,7 @@ const breadcrumbs = computed(() => {
             />
 
             <UButton
-              :to="currentFolderId ? `/new?folder=${currentFolderId}` : '/new'"
+              :to="currentFolderId ? `/new?folder=${currentFolderId}&path=${currentPath}` : `/new?path=${currentPath}`"
               icon="i-heroicons-plus"
               color="primary"
             >

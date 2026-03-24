@@ -26,6 +26,8 @@ const viewType = computed(() => (route.query.type as string) || 'tree')
 // --- API URLs ---
 const apiQuery = computed(() => {
   const q: any = { branch: currentBranch.value, path: currentPath.value }
+  if (currentPath.value) q.path = currentPath.value
+
   if (props.directoryId) q.directory_id = props.directoryId
   return q
 })
@@ -65,13 +67,17 @@ const readmeQuery = computed(() => {
 })
 
 const { data: readmeContent } = useApi<{ content: string }>(
-  computed(() => hasReadme.value ? `/api/v1/repositories/${props.repo.name}/blob` : null),
+  readmeUrl,
   {
-    query: computed(() => ({
-      path: hasReadme.value?.name,
-      branch: 'master',
-      directory_id: props.directoryId
-    }))
+    query: computed(() => {
+      const q: any = {
+        path: hasReadme.value?.name,
+        branch: 'master'
+      }
+      if (props.directoryId) q.directory_id = props.directoryId
+      return q
+    }),
+    watch: [readmeUrl, currentBranch]
   }
 )
 

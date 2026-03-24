@@ -39,8 +39,14 @@ namespace codelab::api
       auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
       if (ctx.user_id == 0) return crow::response(401);
 
+      dao::UserDAO user_dao;
+      auto user = user_dao.FindById(ctx.user_id);
+
+      if (!user) return crow::response(404, "User not found");
+
       crow::json::wvalue res;
       res["id"] = ctx.user_id;
+      res["username"] = user->username;
       res["status"] = "authenticated";
 
       return crow::response(200, res);
@@ -100,13 +106,24 @@ namespace codelab::api
     ([&app](const crow::request& req)
     {
       auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
-      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+      if (ctx.user_id == 0) return crow::response(401);
 
-      std::string path_str = "";
+      // 1. Identify the Owner vs the Requester
+      const char* user_ptr = req.url_params.get("username");
+      if (!user_ptr) return crow::response(400, "Username is required");
+      std::string target_username = user_ptr;
+
+      dao::UserDAO user_dao;
+      auto target_user = user_dao.FindByUsername(target_username);
+      if (!target_user) return crow::response(404, "User not found");
+
+      int owner_id = target_user->id;
+      int requester_id = ctx.user_id;
+      bool is_owner = (owner_id == requester_id);
+
+      // 2. Setup Path Resolution
+      std::string path_str;
       if (req.url_params.get("path")) path_str = req.url_params.get("path");
-
-      // DEBUG: Print what we received
-      std::cout << "[DEBUG] Resolving path: '" << path_str << "'" << std::endl;
 
       std::vector<std::string> segments;
       std::stringstream ss(path_str);
@@ -122,12 +139,13 @@ namespace codelab::api
       bool is_directory = true;
       int resolved_id = 0;
 
-      // 1. Traverse path
+      // 3. Traverse path (Using owner_id for lookups)
       for (size_t i = 0; i < segments.size(); i++) {
         const auto& name = segments[i];
         bool is_last = (i == segments.size() - 1);
 
-        auto dir = dir_dao.FindByName(ctx.user_id, current_parent_id, name);
+        // Look for a directory owned by the target user
+        auto dir = dir_dao.FindByName(owner_id, current_parent_id, name);
         if (dir) {
           current_parent_id = dir->id;
           if (is_last) resolved_id = dir->id;
@@ -135,8 +153,13 @@ namespace codelab::api
         }
 
         if (is_last) {
-           auto repo = repo_dao.FindByName(ctx.user_id, current_parent_id, name);
+           // Look for a repository owned by the target user
+           auto repo = repo_dao.FindByName(owner_id, current_parent_id, name);
            if (repo) {
+             // PRIVACY CHECK: Direct access via URL
+             if (repo->is_private && !is_owner) {
+                return crow::response(403, "Access Denied: This repository is private");
+             }
              resolved_id = repo->id;
              is_directory = false;
              break;
@@ -146,13 +169,15 @@ namespace codelab::api
         return crow::response(404, "Path not found");
       }
 
+      // 4. Build Response
       crow::json::wvalue res;
       if (is_directory) {
         res["type"] = "directory";
         if (current_parent_id.has_value()) res["directory_id"] = current_parent_id.value();
 
-        auto dirs = dir_dao.ListByParent(ctx.user_id, current_parent_id);
-        auto repos = repo_dao.ListByDirectory(ctx.user_id, current_parent_id);
+        // Use owner_id to list the contents
+        auto dirs = dir_dao.ListByParent(owner_id, current_parent_id);
+        auto repos = repo_dao.ListByDirectory(owner_id, current_parent_id);
 
         res["directories"] = crow::json::wvalue::list();
         for(size_t i=0; i<dirs.size(); i++) {
@@ -162,24 +187,37 @@ namespace codelab::api
         }
 
         res["repositories"] = crow::json::wvalue::list();
+        size_t repo_idx = 0;
         for(size_t i=0; i<repos.size(); i++) {
-           res["repositories"][i]["id"] = repos[i].id;
-           res["repositories"][i]["name"] = repos[i].name;
-           res["repositories"][i]["type"] = "repository";
-           res["repositories"][i]["is_private"] = repos[i].is_private;
+           // PRIVACY FILTER: Skip private repos if the requester isn't the owner
+           if (repos[i].is_private && !is_owner) {
+              continue;
+           }
+
+           res["repositories"][repo_idx]["id"] = repos[i].id;
+           res["repositories"][repo_idx]["name"] = repos[i].name;
+           res["repositories"][repo_idx]["type"] = "repository";
+           res["repositories"][repo_idx]["is_private"] = repos[i].is_private;
+           repo_idx++;
         }
       } else {
+        // REPOSITORY VIEW
         res["type"] = "repository";
         if (current_parent_id.has_value()) res["directory_id"] = current_parent_id.value();
 
         auto repo = repo_dao.FindById(resolved_id);
         if (repo) {
+            // Double check privacy even if FindByName caught it
+            if (repo->is_private && !is_owner) {
+                return crow::response(403, "Access Denied");
+            }
             res["repository"]["id"] = repo->id;
             res["repository"]["name"] = repo->name;
-            res["repository"]["description"] = repo->description;
+            res["repository"]["description"] = repo->description; // Preserved
             res["repository"]["is_private"] = repo->is_private;
         }
       }
+
       return crow::response(200, res);
     });
 

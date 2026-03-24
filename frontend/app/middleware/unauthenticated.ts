@@ -5,6 +5,6 @@ export default defineNuxtRouteMiddleware(async (to, from) => {
     const user = await fetchUser()
 
     if (user) {
-        navigateTo('/')
+        navigateTo(`/u/${user.username}`)
     }
 })

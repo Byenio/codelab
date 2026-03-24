@@ -30,8 +30,8 @@ async function handleLogin() {
       const user = await fetchUser(response.token)
 
       if (user) {
-        toast.add({ title: 'Welcome!', color: 'success' })
-        await navigateTo('/')
+        toast.add({ title: `Welcome ${user.username}!`, color: 'success' })
+        await navigateTo(`/u/${user.username}`)
       } else {
         toast.add({
           title: 'Authentication Error',

@@ -5,8 +5,11 @@ definePageMeta({
   middleware: authenticated
 })
 
+const { user } = useAuth()
 const route = useRoute()
 const toast = useToast()
+
+const parentPath = computed(() => route.query.path as string || '')
 
 const form = reactive({
   name: '',
@@ -38,8 +41,11 @@ async function onSubmit() {
       color: 'success'
     })
 
-    const query = form.directory_id ? { folder: form.directory_id } : {}
-    await navigateTo({ path: `/${form.name}`, query })
+    const username = user.value.username
+    const pathPrefix = parentPath.value ? `/${parentPath.value}` : ''
+    const targetPath = `/u/${username}${pathPrefix}/${form.name}`
+
+    await navigateTo(targetPath)
   } catch (error: any) {
     toast.add({
       title: 'Creation Failed',
