@@ -64,10 +64,16 @@ const readmeQuery = computed(() => {
   return q;
 });
 
-const { data: readmeContent } = useApi<{ content: string }>(readmeUrl.value, {
-  query: readmeQuery,
-  watch: [readmeUrl, hasReadme]
-});
+const { data: readmeContent } = useApi<{content: string}>(
+    computed(() => hasReadme.value ? `/api/v1/repositories/${props.repo.name}/blob` : null),
+    {
+      query: computed(() => ({
+        path: hasReadme.value?.name,
+        branch: 'master',
+        directory_id: props.directoryId
+      }))
+    }
+);
 
 // --- Actions ---
 

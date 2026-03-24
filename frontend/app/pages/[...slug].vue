@@ -10,6 +10,7 @@ definePageMeta({
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 
 // Reconstruct path from slug array
 const currentPath = computed(() => {
@@ -19,20 +20,64 @@ const currentPath = computed(() => {
 })
 
 // Resolve the path (Backend returns either directory contents OR repository metadata)
-const { data, error } = await useApi<any>('/api/v1/fs/resolve', {
+const { data, error, refresh } = await useApi<any>('/api/v1/fs/resolve', {
   query: computed(() => ({ path: currentPath.value })),
   watch: [currentPath]
 })
 
+// 3. New Folder Logic
+const isCreateFolderOpen = ref(false)
+const newFolderName = ref('')
+const isCreating = ref(false)
+
+// Get the ID of the directory we are currently viewing from the resolve response
+const currentFolderId = computed(() => data.value?.directory_id || null)
+
+async function createFolder() {
+  if (!newFolderName.value) return
+  isCreating.value = true
+  try {
+    await useApi('/api/v1/directories', {
+      method: 'POST',
+      body: {
+        name: newFolderName.value,
+        parent_id: currentFolderId.value // Pass the current directory ID as parent
+      }
+    })
+    isCreateFolderOpen.value = false
+    newFolderName.value = ''
+    if (refresh) await refresh()
+    toast.add({ title: 'Success', description: 'Folder created', color: 'success' })
+  } catch (e) {
+    toast.add({ title: 'Error', description: 'Failed to create folder', color: 'error' })
+  } finally {
+    isCreating.value = false
+  }
+}
+
 // --- Type Guards ---
 const isDirectory = computed(() => !data.value || data.value.type === 'directory')
 const isRepository = computed(() => data.value && data.value.type === 'repository')
+const isFile = computed(() => data.value && data.value.type === 'file')
+
 const repoData = computed(() => data.value?.repository)
 const repoDirId = computed(() => data.value?.directory_id)
 
+const slugify = (text: string) => {
+  return text
+      .toString()
+      .toLowerCase()
+      .replace(/\s+/g, '-')           // Replace spaces with -
+      .replace(/[^\w\-]+/g, '')       // Remove all non-word chars
+      .replace(/\-\-+/g, '-')         // Replace multiple - with single -
+      .replace(/^-+/, '')             // Trim - from start
+      .replace(/-+$/, '');            // Trim - from end
+}
+
 // --- Navigation ---
 const navigateToItem = (item: any) => {
-  const newPath = currentPath.value ? `${currentPath.value}/${item.name}` : item.name
+  const slugName = slugify(item.name)
+  const newPath = currentPath.value ? `${currentPath.value}/${slugName}` : slugName
   router.push('/' + newPath)
 }
 
@@ -82,8 +127,20 @@ const breadcrumbs = computed(() => {
             {{ breadcrumbs.length ? breadcrumbs[breadcrumbs.length-1].name : 'Home' }}
           </h1>
           <div class="flex gap-2">
-            <UButton icon="i-heroicons-folder-plus" color="neutral" label="New Folder" />
-            <UButton icon="i-heroicons-plus" color="primary" label="New Repository" />
+            <UButton
+                icon="i-heroicons-folder-plus"
+                color="neutral"
+                label="New Folder"
+                @click="isCreateFolderOpen = true"
+            />
+
+            <UButton
+                :to="currentFolderId ? `/new?folder=${currentFolderId}` : '/new'"
+                icon="i-heroicons-plus"
+                color="primary"
+            >
+              New Repository
+            </UButton>
           </div>
         </div>
 
@@ -127,6 +184,21 @@ const breadcrumbs = computed(() => {
           :directory-id="repoDirId"
       />
 
+      <!-- Modal -->
+      <UModal v-model:open="isCreateFolderOpen" title="Create New Folder">
+        <template #body>
+          <form @submit.prevent="createFolder" class="space-y-4">
+            <UFormField label="Folder Name">
+              <UInput v-model="newFolderName" placeholder="e.g. My Projects" autofocus />
+            </UFormField>
+
+            <div class="flex justify-end gap-2 pt-2">
+              <UButton color="neutral" variant="ghost" @click="isCreateFolderOpen = false">Cancel</UButton>
+              <UButton type="submit" :loading="isCreating" :disabled="!newFolderName">Create</UButton>
+            </div>
+          </form>
+        </template>
+      </UModal>
     </main>
   </div>
 </template>
