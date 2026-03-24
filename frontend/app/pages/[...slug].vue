@@ -30,6 +30,13 @@ const isCreateFolderOpen = ref(false)
 const newFolderName = ref('')
 const isCreating = ref(false)
 
+watch(newFolderName, (newValue) => {
+  const formatted = newValue.replace(/\s+/g, '-')
+  if (newValue !== formatted) {
+    newFolderName.value = formatted
+  }
+})
+
 // Get the ID of the directory we are currently viewing from the resolve response
 const currentFolderId = computed(() => data.value?.directory_id || null)
 
