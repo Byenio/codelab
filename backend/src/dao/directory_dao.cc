@@ -107,4 +107,45 @@ namespace codelab::dao
     sqlite3_finalize(stmt);
     return std::nullopt;
   }
+
+  std::optional<models::Directory> DirectoryDAO::FindByName(int user_id, std::optional<int> parent_id, const std::string &name)
+  {
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+
+    std::string sql;
+    if (parent_id.has_value()) {
+      sql = "SELECT id, user_id, parent_id, name FROM directories WHERE user_id = ? AND parent_id = ? AND name = ?;";
+    } else {
+      sql = "SELECT id, user_id, parent_id, name FROM directories WHERE user_id = ? AND parent_id IS NULL AND name = ?;";
+    }
+
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return std::nullopt;
+
+    sqlite3_bind_int(stmt, 1, user_id);
+
+    int name_idx = 2;
+    if (parent_id.has_value()) {
+      sqlite3_bind_int(stmt, 2, parent_id.value());
+      name_idx = 3;
+    }
+
+    sqlite3_bind_text(stmt, name_idx, name.c_str(), -1, SQLITE_STATIC);
+
+    std::optional<models::Directory> result = std::nullopt;
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+      models::Directory dir;
+      dir.id = sqlite3_column_int(stmt, 0);
+      dir.user_id = sqlite3_column_int(stmt, 1);
+      if (sqlite3_column_type(stmt, 2) != SQLITE_NULL) {
+        dir.parent_id = sqlite3_column_int(stmt, 2);
+      }
+      dir.name = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 3));
+      result = dir;
+    }
+
+    sqlite3_finalize(stmt);
+    return result;
+  }
 }

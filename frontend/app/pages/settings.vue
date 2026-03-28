@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import authenticated from "~/middleware/authenticated";
+import authenticated from '~/middleware/authenticated'
 
 definePageMeta({
   middleware: authenticated
@@ -13,8 +13,8 @@ definePageMeta({
       <aside class="w-64 flex-shrink-0">
         <nav class="space-y-1">
           <NuxtLink
-              to="/settings/keys"
-              class="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-neutral-100"
+            to="/settings/keys"
+            class="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-md bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-neutral-100"
           >
             <UIcon name="i-heroicons-key" />
             SSH Keys
