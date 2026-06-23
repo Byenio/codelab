@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y \
     python3 \
     ninja-build \
     autoconf \
+    autoconf-archive  \
+    automake \
     libtool \
     wget \
     && rm -rf /var/lib/apt/lists/*
@@ -44,13 +46,25 @@ RUN cmake -B build -S . \
 
 RUN cmake --build build --target codelab_server codelab_shell
 
+# Frontend Build
+
+FROM node:20 AS frontend-builder
+WORKDIR /app
+RUN npm install -g pnpm
+COPY frontend/package.json frontend/pnpm-lock.yaml frontend/pnpm-workspace.yaml* ./
+RUN pnpm install --frozen-lockfile
+COPY frontend/ ./
+RUN pnpm build
+
 # Runtime
 
 FROM ubuntu:22.04
 
-ENV DEBIAN_FRONTENT=noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y curl gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
     openssh-server \
     git \
     libsqlite3-0 \
@@ -71,12 +85,22 @@ COPY --from=builder /app/build/backend/codelab_server /app/codelab_server
 COPY --from=builder /app/build/backend/codelab_shell /app/codelab_shell
 COPY --from=builder /app/backend/db/schema.sql /app/data/db/schema.sql
 
+COPY --from=frontend-builder /app/.output /app/frontend
+
 RUN mkdir -p /app/db
 COPY --from=builder /app/backend/db/schema.sql /app/db/schema.sql
 
+# Clear any default configuration settings that conflict
 RUN sed -i 's/UsePAM yes/UsePAM no/' /etc/ssh/sshd_config || echo "UsePAM no" >> /etc/ssh/sshd_config
 RUN sed -i 's/#StrictModes yes/StrictModes no/' /etc/ssh/sshd_config || echo "StrictModes no" >> /etc/ssh/sshd_config
 RUN sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config
+
+# CRITICAL OVERRIDES FOR PODMAN ROOTLESS + KEEP-ID
+RUN echo "AuthorizedKeysFile /home/git/.ssh/authorized_keys" >> /etc/ssh/sshd_config
+
+# FORCE SSH LOGS TO STANDARD ERROR OUTPUT INSTEAD OF SYSLOG
+RUN echo "LogLevel DEBUG3" >> /etc/ssh/sshd_config
+RUN echo "Port 2222" >> /etc/ssh/sshd_config
 
 RUN sed -i 's/#AuthorizedKeysFile/AuthorizedKeysFile/' /etc/ssh/sshd_config
 RUN sed -i 's/AuthorizedKeysFile.*/AuthorizedKeysFile .ssh\/authorized_keys/' /etc/ssh/sshd_config
@@ -92,6 +116,6 @@ RUN apt-get update && apt-get install -y dos2unix && dos2unix /app/entrypoint.sh
 
 RUN chmod +x /app/entrypoint.sh
 
-EXPOSE 8080 22
+EXPOSE 3000 8080 2222
 
 CMD ["/app/entrypoint.sh"]

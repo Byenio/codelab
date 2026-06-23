@@ -177,4 +177,111 @@ namespace codelab::dao
     sqlite3_finalize(stmt);
     return results;
   }
+
+  bool RepositoryDAO::Delete(int id)
+  {
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+
+    std::string sql = "DELETE FROM repositories WHERE id=?;";
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return false;
+
+    sqlite3_bind_int(stmt, 1, id);
+
+    bool success = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return success;
+  }
+
+  bool RepositoryDAO::UpdateDirectory(int id, std::optional<int> new_directory_id)
+  {
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+
+    std::string sql = "UPDATE repositories SET directory_id=? WHERE id=?;";
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return false;
+
+    if (new_directory_id.has_value()) {
+      sqlite3_bind_int(stmt, 1, new_directory_id.value());
+    } else {
+      sqlite3_bind_null(stmt, 1);
+    }
+    sqlite3_bind_int(stmt, 2, id);
+
+    bool success = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return success;
+  }
+
+  bool RepositoryDAO::AddCollaborator(int repo_id, int user_id)
+  {
+    std::string q = "INSERT OR IGNORE INTO collaborators (repository_id, user_id) VALUES (?, ?);";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(core::Database::GetInstance().GetHandle(), q.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
+    {
+      return false;
+    }
+
+    sqlite3_bind_int(stmt, 1, repo_id);
+    sqlite3_bind_int(stmt, 2, user_id);
+
+    bool success = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return success;
+  }
+
+  bool RepositoryDAO::RemoveCollaborator(int repo_id, int user_id)
+  {
+    std::string q = "DELETE FROM collaborators WHERE repository_id = ? AND user_id = ?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(core::Database::GetInstance().GetHandle(), q.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
+    {
+      return false;
+    }
+
+    sqlite3_bind_int(stmt, 1, repo_id);
+    sqlite3_bind_int(stmt, 2, user_id);
+
+    bool success = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return success;
+  }
+
+  bool RepositoryDAO::IsCollaborator(int repo_id, int user_id)
+  {
+    std::string q = "SELECT 1 FROM collaborators WHERE repository_id = ? AND user_id = ?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(core::Database::GetInstance().GetHandle(), q.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
+    {
+      return false;
+    }
+
+    sqlite3_bind_int(stmt, 1, repo_id);
+    sqlite3_bind_int(stmt, 2, user_id);
+
+    bool is_collab = (sqlite3_step(stmt) == SQLITE_ROW);
+    sqlite3_finalize(stmt);
+    return is_collab;
+  }
+
+  std::vector<int> RepositoryDAO::ListCollaboratorIds(int repo_id)
+  {
+    std::vector<int> ids;
+    std::string q = "SELECT user_id FROM collaborators WHERE repository_id = ?;";
+    sqlite3_stmt* stmt;
+    if (sqlite3_prepare_v2(core::Database::GetInstance().GetHandle(), q.c_str(), -1, &stmt, nullptr) != SQLITE_OK)
+    {
+      return ids;
+    }
+
+    sqlite3_bind_int(stmt, 1, repo_id);
+
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+      ids.push_back(sqlite3_column_int(stmt, 0));
+    }
+
+    sqlite3_finalize(stmt);
+    return ids;
+  }
 }

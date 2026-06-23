@@ -6,6 +6,7 @@
 
 #include "core/config.h"
 #include "core/db.h"
+#include "dao/directory_dao.h"
 #include "dao/repository_dao.h"
 #include "dao/user_dao.h"
 #include "models/user.h"
@@ -103,18 +104,45 @@ int main(int argc, char* argv[])
 
   int owner_id = owner->id;
 
-  codelab::dao::RepositoryDAO repo_dao;
-  auto repo = repo_dao.FindByName(owner_id, std::nullopt, repo_name);
+  // 1. Strip trailing ".git" suffix if present (common in git SSH URLs)
+  if (repo_name.size() > 4 && repo_name.substr(repo_name.size() - 4) == ".git") {
+    repo_name = repo_name.substr(0, repo_name.size() - 4);
+  }
 
-  if (!repo) {
-    std::cerr << "Repository not found" << std::endl;
+  // 2. Split the path into individual folder/repo segments
+  std::vector<std::string> segments = Split(repo_name, '/');
+  if (segments.empty()) {
+    std::cerr << "Invalid repository path" << std::endl;
     return 1;
   }
 
-  // TODO: allow collaborators
+  std::optional<int> current_parent_id = std::nullopt;
+  codelab::dao::DirectoryDAO dir_dao;
+
+  // 3. Walk through all segments except the last one to resolve nested folders
+  for (size_t i = 0; i < segments.size() - 1; ++i) {
+    auto dir = dir_dao.FindByName(owner_id, current_parent_id, segments[i]);
+    if (!dir) {
+      std::cerr << "Directory not found: " << segments[i] << std::endl;
+      return 1;
+    }
+    current_parent_id = dir->id;
+  }
+
+  // 4. The last segment is the actual repository name
+  std::string final_repo_name = segments.back();
+
+  codelab::dao::RepositoryDAO repo_dao;
+  auto repo = repo_dao.FindByName(owner_id, current_parent_id, final_repo_name);
+
+  if (!repo) {
+    std::cerr << "Repository not found: " << final_repo_name << std::endl;
+    return 1;
+  }
+
   bool authorized = false;
 
-  if (repo->user_id == user_id) {
+  if (repo->user_id == user_id || repo_dao.IsCollaborator(repo->id, user_id)) {
     authorized = true;
   }
 

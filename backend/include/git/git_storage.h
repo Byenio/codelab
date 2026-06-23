@@ -22,6 +22,10 @@ namespace codelab::git
     std::vector<models::FileEntry> ListFiles(const std::string& disk_path_hash, const std::string& branch, const std::string& directory_path);
     std::optional<std::string> GetFileContent(const std::string& disk_path_hash, const std::string& branch, const std::string& filepath);
 
+    bool CreateBranch(const std::string& disk_path_hash, const std::string& branch_name, const std::string& target_branch = "HEAD");
+    bool DeleteBranch(const std::string& disk_path_hash, const std::string& branch_name);
+    bool MergeBranch(const std::string& disk_path_hash, const std::string& source_branch, const std::string& target_branch);
+
   private:
     std::string root_path_;
 

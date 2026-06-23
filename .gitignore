@@ -64,3 +64,6 @@ Desktop.ini
 
 # --- env ---
 backend/.env
+
+AGENTS.md
+TODO.md

@@ -3,6 +3,7 @@
 #include "dao/repository_dao.h"
 #include "dao/directory_dao.h"
 #include "dao/ssh_key_dao.h"
+#include "dao/pull_request_dao.h"
 #include "git/git_viewer.h"
 #include "services/repo_service.h"
 #include "services/git_http_service.h"
@@ -157,7 +158,7 @@ namespace codelab::api
            auto repo = repo_dao.FindByName(owner_id, current_parent_id, name);
            if (repo) {
              // PRIVACY CHECK: Direct access via URL
-             if (repo->is_private && !is_owner) {
+             if (repo->is_private && !is_owner && !repo_dao.IsCollaborator(repo->id, requester_id)) {
                 return crow::response(403, "Access Denied: This repository is private");
              }
              resolved_id = repo->id;
@@ -189,8 +190,8 @@ namespace codelab::api
         res["repositories"] = crow::json::wvalue::list();
         size_t repo_idx = 0;
         for(size_t i=0; i<repos.size(); i++) {
-           // PRIVACY FILTER: Skip private repos if the requester isn't the owner
-           if (repos[i].is_private && !is_owner) {
+           // PRIVACY FILTER: Skip private repos if the requester isn't the owner or collaborator
+           if (repos[i].is_private && !is_owner && !repo_dao.IsCollaborator(repos[i].id, requester_id)) {
               continue;
            }
 
@@ -208,7 +209,7 @@ namespace codelab::api
         auto repo = repo_dao.FindById(resolved_id);
         if (repo) {
             // Double check privacy even if FindByName caught it
-            if (repo->is_private && !is_owner) {
+            if (repo->is_private && !is_owner && !repo_dao.IsCollaborator(repo->id, requester_id)) {
                 return crow::response(403, "Access Denied");
             }
             res["repository"]["id"] = repo->id;
@@ -302,9 +303,117 @@ namespace codelab::api
       return crow::response(500, "Failed to create directory");
     });
 
+    // Delete folder
+    // DELETE /api/v1/directories/<int>
+    CROW_ROUTE(app, "/api/v1/directories/<int>")
+    .methods(crow::HTTPMethod::Delete)
+    ([&app](const crow::request& req, int directory_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
+      if (repo_service.DeleteDirectory(ctx.user_id, directory_id)) {
+          return crow::response(200, "Directory deleted");
+      }
+      return crow::response(400, "Failed to delete directory");
+    });
+
+    // Update (Move/Rename) folder
+    // PATCH /api/v1/directories/<int>
+    CROW_ROUTE(app, "/api/v1/directories/<int>")
+    .methods(crow::HTTPMethod::Patch)
+    ([&app](const crow::request& req, int directory_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401, "Unauthorized");
+
+      auto data = crow::json::load(req.body);
+      if (!data) return crow::response(400, "Invalid JSON");
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
+      bool success = true;
+
+      // Handle rename
+      if (data.has("name")) {
+         if (!repo_service.RenameDirectory(ctx.user_id, directory_id, data["name"].s())) {
+             success = false;
+         }
+      }
+
+      // Handle move
+      if (data.has("parent_id")) {
+         std::optional<int> new_parent_id = std::nullopt;
+         if (data["parent_id"].t() == crow::json::type::Number) {
+             new_parent_id = data["parent_id"].i();
+         }
+
+         if (!repo_service.MoveDirectory(ctx.user_id, directory_id, new_parent_id)) {
+             success = false;
+         }
+      }
+
+      if (success) {
+          return crow::response(200, "Directory updated");
+      }
+      return crow::response(400, "Failed to completely update directory");
+    });
+
     // endregion
 
     // region --- REPOSITORY ---
+
+    // Delete repository
+    // DELETE /api/v1/repositories/<int>
+    CROW_ROUTE(app, "/api/v1/repositories/<int>")
+    .methods(crow::HTTPMethod::Delete)
+    ([&app](const crow::request& req, int repo_id){
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
+      if (repo_service.DeleteRepository(ctx.user_id, repo_id)) {
+        return crow::response(200, "Repository deleted");
+      }
+      return crow::response(400, "Failed to delete repository");
+    });
+
+    // Update (Move) repository
+    // PATCH /api/v1/repositories/<int>
+    CROW_ROUTE(app, "/api/v1/repositories/<int>")
+    .methods(crow::HTTPMethod::Patch)
+    ([&app](const crow::request& req, int repo_id){
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      auto data = crow::json::load(req.body);
+      if (!data) return crow::response(400, "Invalid JSON");
+
+      if (!data.has("directory_id")) {
+          return crow::response(400, "Missing directory_id parameter");
+      }
+
+      std::optional<int> new_dir_id = std::nullopt;
+      if (data["directory_id"].t() == crow::json::type::Number) {
+         new_dir_id = data["directory_id"].i();
+      } else if (data["directory_id"].t() != crow::json::type::Null) {
+         return crow::response(400, "directory_id must be a number or null");
+      }
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
+      if (repo_service.MoveRepository(ctx.user_id, repo_id, new_dir_id)) {
+        return crow::response(200, "Repository moved");
+      }
+      return crow::response(400, "Failed to move repository");
+    });
 
     // Create new repo
     // Post /api/v1/repositories
@@ -470,6 +579,226 @@ namespace codelab::api
       return crow::response(404, "File not found");
     });
 
+    // Get collaborators
+    // GET /api/v1/repositories/<int>/collaborators
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/collaborators")
+    .methods(crow::HTTPMethod::Get)
+    ([&app](const crow::request& req, int repo_id){
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404, "Repository not found");
+      if (repo->user_id != ctx.user_id) return crow::response(403, "Only the owner can list collaborators");
+
+      dao::UserDAO user_dao;
+      auto collab_ids = repo_dao.ListCollaboratorIds(repo_id);
+
+      crow::json::wvalue res = crow::json::wvalue::list();
+      int i = 0;
+      for (int cid : collab_ids) {
+        auto u = user_dao.FindById(cid);
+        if (u) {
+          res[i]["id"] = u->id;
+          res[i]["username"] = u->username;
+          i++;
+        }
+      }
+      return crow::response(200, res);
+    });
+
+    // Add collaborator
+    // POST /api/v1/repositories/<int>/collaborators
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/collaborators")
+    .methods(crow::HTTPMethod::Post)
+    ([&app](const crow::request& req, int repo_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      auto data = crow::json::load(req.body);
+      if (!data || !data.has("username")) return crow::response(400, "username required");
+      std::string target_username = data["username"].s();
+
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404, "Repository not found");
+      if (repo->user_id != ctx.user_id) return crow::response(403, "Only owner can add collaborators");
+
+      dao::UserDAO user_dao;
+      auto target_user = user_dao.FindByUsername(target_username);
+      if (!target_user) return crow::response(404, "Target user not found");
+
+      if (target_user->id == repo->user_id) return crow::response(400, "User is the owner");
+
+      if (repo_dao.AddCollaborator(repo_id, target_user->id)) {
+         return crow::response(200, "Collaborator added");
+      }
+      return crow::response(500, "Failed to add collaborator");
+    });
+
+    // Remove collaborator
+    // DELETE /api/v1/repositories/<int>/collaborators/<string>
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/collaborators/<string>")
+    .methods(crow::HTTPMethod::Delete)
+    ([&app](const crow::request& req, int repo_id, const std::string& target_username)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404, "Repository not found");
+      if (repo->user_id != ctx.user_id) return crow::response(403, "Only owner can remove collaborators");
+
+      dao::UserDAO user_dao;
+      auto target_user = user_dao.FindByUsername(target_username);
+      if (!target_user) return crow::response(404, "Target user not found");
+
+      if (repo_dao.RemoveCollaborator(repo_id, target_user->id)) {
+         return crow::response(200, "Collaborator removed");
+      }
+      return crow::response(500, "Failed to remove collaborator");
+    });
+
+
+    // region --- PULL REQUESTS ---
+
+    // List PRs
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/pull-requests")
+    .methods(crow::HTTPMethod::Get)
+    ([&app](const crow::request& req, int repo_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404, "Repository not found");
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0) {
+        if (repo->user_id == ctx.user_id || repo_dao.IsCollaborator(repo->id, ctx.user_id)) authorized = true;
+      }
+      if (!authorized) return crow::response(404, "Repository not found");
+
+      dao::PullRequestDAO pr_dao;
+      auto prs = pr_dao.ListByRepository(repo_id);
+
+      crow::json::wvalue res = crow::json::wvalue::list();
+      int i = 0;
+      for (const auto& pr : prs) {
+        res[i]["id"] = pr.id;
+        res[i]["author_id"] = pr.author_id;
+        res[i]["title"] = pr.title;
+        res[i]["description"] = pr.description;
+        res[i]["source_branch"] = pr.source_branch;
+        res[i]["target_branch"] = pr.target_branch;
+        res[i]["status"] = pr.status;
+        res[i]["created_at"] = pr.created_at;
+        i++;
+      }
+      return crow::response(200, res);
+    });
+
+    // Create PR
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/pull-requests")
+    .methods(crow::HTTPMethod::Post)
+    ([&app](const crow::request& req, int repo_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      auto data = crow::json::load(req.body);
+      if (!data || !data.has("title") || !data.has("source_branch") || !data.has("target_branch"))
+        return crow::response(400, "Invalid JSON");
+
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404, "Repository not found");
+
+      if (!repo_dao.IsCollaborator(repo_id, ctx.user_id) && repo->user_id != ctx.user_id) {
+         return crow::response(403, "Must be a collaborator to open PR");
+      }
+
+      models::PullRequest pr;
+      pr.repository_id = repo_id;
+      pr.author_id = ctx.user_id;
+      pr.title = data["title"].s();
+      pr.description = data.has("description") ? (std::string)data["description"].s() : "";
+      pr.source_branch = data["source_branch"].s();
+      pr.target_branch = data["target_branch"].s();
+      pr.status = "open";
+
+      dao::PullRequestDAO pr_dao;
+      auto id = pr_dao.Create(pr);
+      if (id) {
+        crow::json::wvalue res;
+        res["id"] = *id;
+        return crow::response(201, res);
+      }
+      return crow::response(500, "Failed to create PR");
+    });
+
+    // Merge PR
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/pull-requests/<int>/merge")
+    .methods(crow::HTTPMethod::Post)
+    ([&app](const crow::request& req, int repo_id, int pr_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404);
+
+      if (!repo_dao.IsCollaborator(repo_id, ctx.user_id) && repo->user_id != ctx.user_id) {
+         return crow::response(403, "Must be a collaborator to merge PR");
+      }
+
+      dao::PullRequestDAO pr_dao;
+      auto pr = pr_dao.FindById(pr_id);
+      if (!pr || pr->repository_id != repo_id) return crow::response(404);
+      if (pr->status != "open") return crow::response(400, "PR is not open");
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
+      if (repo_service.MergeBranch(ctx.user_id, repo_id, pr->source_branch, pr->target_branch)) {
+        pr_dao.UpdateStatus(pr_id, "merged");
+        return crow::response(200, "PR Merged");
+      }
+      return crow::response(400, "Failed to merge PR");
+    });
+
+    // Close PR
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/pull-requests/<int>/close")
+    .methods(crow::HTTPMethod::Post)
+    ([&app](const crow::request& req, int repo_id, int pr_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404);
+
+      if (!repo_dao.IsCollaborator(repo_id, ctx.user_id) && repo->user_id != ctx.user_id) {
+         return crow::response(403, "Must be a collaborator to close PR");
+      }
+
+      dao::PullRequestDAO pr_dao;
+      auto pr = pr_dao.FindById(pr_id);
+      if (!pr || pr->repository_id != repo_id) return crow::response(404);
+      if (pr->status != "open") return crow::response(400, "PR is not open");
+
+      if (pr_dao.UpdateStatus(pr_id, "closed")) {
+        return crow::response(200, "PR Closed");
+      }
+      return crow::response(500, "Failed to close PR");
+    });
+
+    // endregion
+
     // endregion
 
     // region --- GIT OPERATIONS ---
@@ -489,8 +818,7 @@ namespace codelab::api
       bool authorized = !repo->is_private;
       if (!authorized && ctx.user_id != 0)
       {
-        // TODO: allow collaborators
-        if (repo->user_id == ctx.user_id) authorized = true;
+        if (repo->user_id == ctx.user_id || repo_dao.IsCollaborator(repo->id, ctx.user_id)) authorized = true;
       }
 
       if (!authorized) return crow::response(404, "Repository not found");
@@ -526,8 +854,7 @@ namespace codelab::api
       bool authorized = !repo->is_private;
       if (!authorized && ctx.user_id != 0)
       {
-        // TODO: allow collaborators
-        if (repo->user_id == ctx.user_id) authorized = true;
+        if (repo->user_id == ctx.user_id || repo_dao.IsCollaborator(repo->id, ctx.user_id)) authorized = true;
       }
 
       if (!authorized) return crow::response(404, "Repository not found");
@@ -566,8 +893,7 @@ namespace codelab::api
       bool authorized = !repo->is_private;
       if (!authorized && ctx.user_id != 0)
       {
-        // TODO: allow collaborators
-        if (repo->user_id == ctx.user_id) authorized = true;
+        if (repo->user_id == ctx.user_id || repo_dao.IsCollaborator(repo->id, ctx.user_id)) authorized = true;
       }
 
       if (!authorized) return crow::response(404, "Repository not found");
@@ -605,8 +931,7 @@ namespace codelab::api
       bool authorized = !repo->is_private;
       if (!authorized && ctx.user_id != 0)
       {
-        // TODO: allow collaborators
-        if (repo->user_id == ctx.user_id) authorized = true;
+        if (repo->user_id == ctx.user_id || repo_dao.IsCollaborator(repo->id, ctx.user_id)) authorized = true;
       }
 
       if (!authorized) return crow::response(404, "Repository not found");
@@ -627,6 +952,76 @@ namespace codelab::api
       crow::json::wvalue res;
       res["content"] = *content;
       return crow::response(200, res);
+    });
+
+    // endregion
+
+    // region --- BRANCH MANAGEMENT ---
+
+    // Create branch
+    // POST /api/v1/repositories/<int>/branches
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/branches")
+    .methods(crow::HTTPMethod::Post)
+    ([&app](const crow::request& req, int repo_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      auto data = crow::json::load(req.body);
+      if (!data) return crow::response(400, "Invalid JSON");
+      if (!data.has("name")) return crow::response(400, "Branch name is required");
+
+      std::string branch_name = data["name"].s();
+      std::string target_branch = data.has("target_branch") ? (std::string)data["target_branch"].s() : "HEAD";
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
+      if (repo_service.CreateBranch(ctx.user_id, repo_id, branch_name, target_branch)) {
+        return crow::response(201, "Branch created");
+      }
+      return crow::response(400, "Failed to create branch");
+    });
+
+    // Delete branch
+    // DELETE /api/v1/repositories/<int>/branches/<string>
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/branches/<string>")
+    .methods(crow::HTTPMethod::Delete)
+    ([&app](const crow::request& req, int repo_id, const std::string& branch_name)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
+      if (repo_service.DeleteBranch(ctx.user_id, repo_id, branch_name)) {
+        return crow::response(200, "Branch deleted");
+      }
+      return crow::response(400, "Failed to delete branch");
+    });
+
+    // Merge branch
+    // POST /api/v1/repositories/<int>/branches/<string>/merge
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/branches/<string>/merge")
+    .methods(crow::HTTPMethod::Post)
+    ([&app](const crow::request& req, int repo_id, const std::string& target_branch)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      if (ctx.user_id == 0) return crow::response(401);
+
+      auto data = crow::json::load(req.body);
+      if (!data || !data.has("source_branch")) return crow::response(400, "source_branch is required");
+
+      std::string source_branch = data["source_branch"].s();
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      services::RepoService repo_service(storage_path);
+
+      if (repo_service.MergeBranch(ctx.user_id, repo_id, source_branch, target_branch)) {
+        return crow::response(200, "Branch merged");
+      }
+      return crow::response(400, "Failed to merge branch/conflicts detected");
     });
 
     // endregion
@@ -659,11 +1054,10 @@ namespace codelab::api
 
       if (is_read_op)
       {
-        if ((!repo->is_private) || (user_id != 0 && repo->user_id == user_id)) authorized = true;
+        if ((!repo->is_private) || (user_id != 0 && (repo->user_id == user_id || repo_dao.IsCollaborator(repo->id, user_id)))) authorized = true;
       } else if (is_write_op)
       {
-        // TODO: allow collaborators
-        if (user_id != 0 && repo->user_id == user_id) authorized = true;
+        if (user_id != 0 && (repo->user_id == user_id || repo_dao.IsCollaborator(repo->id, user_id))) authorized = true;
       }
 
       if (!authorized) {
@@ -714,11 +1108,10 @@ namespace codelab::api
 
       if (is_read_op)
       {
-        if ((!repo->is_private) || (user_id != 0 && repo->user_id == user_id)) authorized = true;
+        if ((!repo->is_private) || (user_id != 0 && (repo->user_id == user_id || repo_dao.IsCollaborator(repo->id, user_id)))) authorized = true;
       } else if (is_write_op)
       {
-        // TODO: allow collaborators
-        if (user_id != 0 && repo->user_id == user_id) authorized = true;
+        if (user_id != 0 && (repo->user_id == user_id || repo_dao.IsCollaborator(repo->id, user_id))) authorized = true;
       }
 
       if (!authorized) {

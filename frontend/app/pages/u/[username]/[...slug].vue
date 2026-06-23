@@ -71,6 +71,81 @@ const isFile = computed(() => data.value && data.value.type === 'file')
 const repoData = computed(() => data.value?.repository)
 const repoDirId = computed(() => data.value?.directory_id)
 
+const isMoveRepoOpen = ref(false)
+const repoToMove = ref<any>(null)
+const moveRepoTargetDirStr = ref('')
+const isMovingRepo = ref(false)
+
+async function deleteDirectory(dir: any) {
+  if (!confirm(`Are you sure you want to delete folder "${dir.name}"?`)) return
+  try {
+    await useApi(`/api/v1/directories/${dir.id}`, { method: 'DELETE' })
+    toast.add({ title: 'Directory deleted', color: 'success' })
+    if (refresh) await refresh()
+  } catch (e: any) {
+    toast.add({ title: 'Error', description: 'Failed to delete directory', color: 'error' })
+  }
+}
+
+async function deleteRepository(repo: any) {
+  if (!confirm(`Are you sure you want to delete repository "${repo.name}"?`)) return
+  try {
+    await useApi(`/api/v1/repositories/${repo.id}`, { method: 'DELETE' })
+    toast.add({ title: 'Repository deleted', color: 'success' })
+    if (refresh) await refresh()
+  } catch (e: any) {
+    toast.add({ title: 'Error', description: 'Failed to delete repository', color: 'error' })
+  }
+}
+
+function openMoveRepo(repo: any) {
+  repoToMove.value = repo
+  moveRepoTargetDirStr.value = ''
+  isMoveRepoOpen.value = true
+}
+
+async function moveRepository() {
+  isMovingRepo.value = true
+  let targetDirId = null
+
+  if (moveRepoTargetDirStr.value.trim()) {
+    const { data: resolveRes, error: resolveErr } = await useApi<any>('/api/v1/fs/resolve', {
+      query: {
+        username: username.value,
+        path: moveRepoTargetDirStr.value.trim()
+      }
+    })
+
+    if (resolveErr.value) {
+      toast.add({ title: 'Error', description: 'Target path not found', color: 'error' })
+      isMovingRepo.value = false
+      return
+    }
+
+    if (resolveRes.value?.type !== 'directory') {
+      toast.add({ title: 'Error', description: 'Target path is not a valid directory', color: 'error' })
+      isMovingRepo.value = false
+      return
+    }
+
+    targetDirId = resolveRes.value?.directory_id || null
+  }
+
+  try {
+    await useApi(`/api/v1/repositories/${repoToMove.value.id}`, {
+      method: 'PATCH',
+      body: { directory_id: targetDirId }
+    })
+    toast.add({ title: 'Repository moved', color: 'success' })
+    isMoveRepoOpen.value = false
+    if (refresh) await refresh()
+  } catch (e: any) {
+    toast.add({ title: 'Error', description: 'Failed to move repository', color: 'error' })
+  } finally {
+    isMovingRepo.value = false
+  }
+}
+
 const slugify = (text: string) => {
   return text
     .toString()
@@ -194,33 +269,64 @@ const breadcrumbs = computed(() => {
             <div
               v-for="dir in data.directories"
               :key="'d'+dir.id"
-              class="flex items-center gap-3 p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group"
+              class="flex items-center gap-3 p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group justify-between"
               @click="navigateToItem(dir)"
             >
-              <UIcon
-                name="i-heroicons-folder"
-                class="w-5 h-5 text-primary-400"
-              />
-              <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500">{{ dir.name }}</span>
+              <div class="flex items-center gap-3">
+                <UIcon
+                  name="i-heroicons-folder"
+                  class="w-5 h-5 text-primary-400"
+                />
+                <span class="text-sm font-medium text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500">{{ dir.name }}</span>
+              </div>
+              <div class="opacity-0 group-hover:opacity-100 flex gap-2" v-if="user?.username === username">
+                <UButton
+                  icon="i-heroicons-trash"
+                  size="xs"
+                  color="error"
+                  variant="ghost"
+                  @click.stop="deleteDirectory(dir)"
+                />
+              </div>
             </div>
 
             <!-- Repositories -->
             <div
               v-for="repo in data.repositories"
               :key="'r'+repo.id"
-              class="flex items-center gap-3 p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group"
+              class="flex items-center gap-3 p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group justify-between"
               @click="navigateToItem(repo)"
             >
-              <UIcon
-                name="i-heroicons-book-open"
-                class="w-5 h-5 text-zinc-400"
-              />
-              <span class="text-sm font-bold text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500">{{ repo.name }}</span>
-              <UIcon
-                v-if="repo.is_private"
-                name="i-heroicons-lock-closed"
-                class="w-3 h-3 text-zinc-400"
-              />
+              <div class="flex items-center gap-3">
+                <UIcon
+                  name="i-heroicons-book-open"
+                  class="w-5 h-5 text-zinc-400"
+                />
+                <span class="text-sm font-bold text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500">{{ repo.name }}</span>
+                <UIcon
+                  v-if="repo.is_private"
+                  name="i-heroicons-lock-closed"
+                  class="w-3 h-3 text-zinc-400"
+                />
+              </div>
+              <div class="opacity-0 group-hover:opacity-100 flex gap-2" v-if="user?.username === username">
+                <UButton
+                  icon="i-heroicons-arrows-pointing-out"
+                  size="xs"
+                  color="primary"
+                  variant="ghost"
+                  title="Move"
+                  @click.stop="openMoveRepo(repo)"
+                />
+                <UButton
+                  icon="i-heroicons-trash"
+                  size="xs"
+                  color="error"
+                  variant="ghost"
+                  title="Delete"
+                  @click.stop="deleteRepository(repo)"
+                />
+              </div>
             </div>
           </div>
         </UCard>
@@ -266,6 +372,46 @@ const breadcrumbs = computed(() => {
                 :disabled="!newFolderName"
               >
                 Create
+              </UButton>
+            </div>
+          </form>
+        </template>
+      </UModal>
+
+      <UModal
+        v-model:open="isMoveRepoOpen"
+        title="Move Repository"
+      >
+        <template #body>
+          <form
+            class="space-y-4"
+            @submit.prevent="moveRepository"
+          >
+            <div class="text-sm mb-4">Moving: <span class="font-bold">{{ repoToMove?.name }}</span></div>
+            <UFormField label="Target Folder Path">
+              <UInput
+                v-model="moveRepoTargetDirStr"
+                placeholder="Leave blank to move to root directory"
+                autofocus
+              />
+              <template #hint>
+                <div class="text-xs text-zinc-500 mt-1">e.g. 'folder', 'folder/subfolder'.</div>
+              </template>
+            </UFormField>
+
+            <div class="flex justify-end gap-2 pt-2">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                @click="isMoveRepoOpen = false"
+              >
+                Cancel
+              </UButton>
+              <UButton
+                type="submit"
+                :loading="isMovingRepo"
+              >
+                Move
               </UButton>
             </div>
           </form>

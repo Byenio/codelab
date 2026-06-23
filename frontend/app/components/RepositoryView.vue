@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useApi } from '~/composables/useApi'
+import { marked } from 'marked'
 
 const props = defineProps<{
   repo: {
@@ -13,6 +14,10 @@ const props = defineProps<{
 
 const route = useRoute()
 const router = useRouter()
+
+const isBranchModalOpen = ref(false)
+const isPRModalOpen = ref(false)
+const isCollaboratorModalOpen = ref(false)
 
 // --- State from Query Params ---
 const currentBranch = computed({
@@ -72,7 +77,7 @@ const { data: readmeContent } = useApi<{ content: string }>(
     query: computed(() => {
       const q: any = {
         path: hasReadme.value?.name,
-        branch: 'master'
+        branch: currentBranch.value
       }
       if (props.directoryId) q.directory_id = props.directoryId
       return q
@@ -80,6 +85,30 @@ const { data: readmeContent } = useApi<{ content: string }>(
     watch: [readmeUrl, currentBranch]
   }
 )
+
+const renderedReadme = computed(() => {
+  if (!readmeContent.value?.content) return ''
+  return marked.parse(readmeContent.value.content)
+})
+
+// --- Branches ---
+const branchesUrl = computed(() => `/api/v1/repositories/${props.repo.id}/branches`)
+const { data: branchesData } = useApi<{ name: string }[]>(branchesUrl.value)
+
+const branchOptions = computed(() => {
+  if (!branchesData.value) return ['master']
+  return branchesData.value.map(b => b.name)
+})
+
+// --- Commits ---
+const commitsUrl = computed(() => {
+  if (viewType.value !== 'commits') return null
+  return `/api/v1/repositories/${props.repo.id}/commits`
+})
+const { data: commitsData, pending: loadingCommits } = useApi<any[]>(commitsUrl, {
+  query: computed(() => ({ branch: currentBranch.value })),
+  watch: [commitsUrl, currentBranch]
+})
 
 // --- Actions ---
 
@@ -158,8 +187,38 @@ const getFileIcon = (file: any) => {
       </UButton>
       <USelectMenu
         v-model="currentBranch"
-        :options="['master']"
+        :items="branchOptions"
         size="sm"
+      />
+      <UButton
+        icon="i-heroicons-cog-6-tooth"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        @click="isBranchModalOpen = true"
+      />
+      <UButton
+        icon="i-heroicons-clock"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        @click="router.push({ query: { ...route.query, type: 'commits' } })"
+      >
+        Commits
+      </UButton>
+      <UButton
+        icon="i-heroicons-users"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        @click="isCollaboratorModalOpen = true"
+      />
+      <UButton
+        icon="i-heroicons-inbox-arrow-down"
+        color="neutral"
+        variant="ghost"
+        size="sm"
+        @click="isPRModalOpen = true"
       />
       <div class="ml-auto font-mono text-sm text-zinc-400 flex items-center">
         {{ currentPath || '/' }}
@@ -239,9 +298,7 @@ const getFileIcon = (file: any) => {
             README.md
           </div>
         </template>
-        <div class="p-6 prose dark:prose-invert max-w-none text-sm whitespace-pre-wrap font-sans">
-          {{ readmeContent.content }}
-        </div>
+        <div class="p-6 prose dark:prose-invert max-w-none text-sm font-sans" v-html="renderedReadme" />
       </UCard>
     </div>
 
@@ -281,5 +338,69 @@ const getFileIcon = (file: any) => {
         <pre class="text-sm font-mono p-4 text-zinc-800 dark:text-zinc-200">{{ fileContent?.content }}</pre>
       </div>
     </UCard>
+
+    <!-- VIEW MODE: COMMITS -->
+    <UCard
+      v-else-if="viewType === 'commits'"
+      class="overflow-hidden p-0"
+    >
+      <div class="border-b border-zinc-200 dark:border-zinc-800 p-3 bg-zinc-100 dark:bg-zinc-900">
+        <h2 class="font-semibold px-1">Commits</h2>
+      </div>
+
+      <div
+        v-if="loadingCommits"
+        class="p-12 flex justify-center"
+      >
+        <UIcon
+          name="i-heroicons-arrow-path"
+          class="animate-spin w-8 h-8 text-zinc-300"
+        />
+      </div>
+
+      <div
+        v-else
+        class="divide-y divide-zinc-100 dark:divide-zinc-800"
+      >
+        <div
+          v-for="commit in commitsData"
+          :key="commit.hash"
+          class="p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 flex flex-col gap-2"
+        >
+          <div class="flex justify-between items-start">
+            <span class="font-bold font-mono text-sm text-zinc-800 dark:text-zinc-200">{{ commit.message }}</span>
+            <span class="text-xs font-mono text-zinc-500 bg-zinc-100 dark:bg-zinc-800 px-2 py-1 rounded">{{ commit.hash.substring(0, 7) }}</span>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-zinc-500">
+            <UIcon name="i-heroicons-user" class="w-3.5 h-3.5" />
+            <span class="font-medium">{{ commit.author }}</span>
+            <span>committed on</span>
+            <span>{{ new Date(commit.date * 1000).toLocaleString() }}</span>
+          </div>
+        </div>
+
+        <div
+          v-if="!commitsData || commitsData.length === 0"
+          class="p-8 text-center text-zinc-400 text-sm"
+        >
+          No commits found on this branch.
+        </div>
+      </div>
+    </UCard>
+
+    <BranchManagerModal
+      v-model="isBranchModalOpen"
+      :repo-id="repo.id"
+    />
+
+    <CollaboratorManagerModal
+      v-model="isCollaboratorModalOpen"
+      :repo-id="repo.id"
+    />
+
+    <PullRequestManagerModal
+      v-model="isPRModalOpen"
+      :repo-id="repo.id"
+    />
   </div>
 </template>

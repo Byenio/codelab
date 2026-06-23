@@ -209,4 +209,133 @@ namespace codelab::git
     git_repository_free(repo);
     return content;
   }
+
+  bool GitStorage::CreateBranch(const std::string &disk_path_hash, const std::string &branch_name, const std::string &target_branch)
+  {
+    std::string full_path = GetFullPath(disk_path_hash);
+    git_repository* repo = nullptr;
+    if (git_repository_open(&repo, full_path.c_str()) != 0) return false;
+
+    git_object* target_obj = nullptr;
+    std::string ref = target_branch.empty() ? "HEAD" : target_branch;
+    if (git_revparse_single(&target_obj, repo, ref.c_str()) != 0) {
+      git_repository_free(repo);
+      return false;
+    }
+
+    git_commit* target_commit = nullptr;
+    if (git_commit_lookup(&target_commit, repo, git_object_id(target_obj)) != 0) {
+      git_object_free(target_obj);
+      git_repository_free(repo);
+      return false;
+    }
+
+    git_reference* new_branch = nullptr;
+    bool success = (git_branch_create(&new_branch, repo, branch_name.c_str(), target_commit, 0) == 0);
+
+    if (new_branch) git_reference_free(new_branch);
+    git_commit_free(target_commit);
+    git_object_free(target_obj);
+    git_repository_free(repo);
+    return success;
+  }
+
+  bool GitStorage::DeleteBranch(const std::string &disk_path_hash, const std::string &branch_name)
+  {
+    std::string full_path = GetFullPath(disk_path_hash);
+    git_repository* repo = nullptr;
+    if (git_repository_open(&repo, full_path.c_str()) != 0) return false;
+
+    git_reference* branch_ref = nullptr;
+    if (git_branch_lookup(&branch_ref, repo, branch_name.c_str(), GIT_BRANCH_LOCAL) != 0) {
+      git_repository_free(repo);
+      return false;
+    }
+
+    bool success = (git_branch_delete(branch_ref) == 0);
+
+    git_reference_free(branch_ref);
+    git_repository_free(repo);
+    return success;
+  }
+
+  bool GitStorage::MergeBranch(const std::string &disk_path_hash, const std::string &source_branch, const std::string &target_branch)
+  {
+      // Since it's a bare repository (created with GIT_REPOSITORY_INIT_BARE),
+      // merge is complex. Let's do it using commit mechanism or fail.
+      std::string full_path = GetFullPath(disk_path_hash);
+      git_repository* repo = nullptr;
+      if (git_repository_open(&repo, full_path.c_str()) != 0) return false;
+
+      git_annotated_commit* their_head = nullptr;
+      git_reference* source_ref = nullptr;
+      if (git_reference_lookup(&source_ref, repo, ("refs/heads/" + source_branch).c_str()) != 0) {
+          git_repository_free(repo);
+          return false;
+      }
+      git_annotated_commit_from_ref(&their_head, repo, source_ref);
+
+      git_merge_options merge_opts = GIT_MERGE_OPTIONS_INIT;
+      git_index* index = nullptr;
+
+      git_commit* target_commit = nullptr;
+      git_reference* target_ref = nullptr;
+      if (git_reference_lookup(&target_ref, repo, ("refs/heads/" + target_branch).c_str()) != 0) {
+          git_reference_free(source_ref);
+          git_annotated_commit_free(their_head);
+          git_repository_free(repo);
+          return false;
+      }
+      git_commit_lookup(&target_commit, repo, git_reference_target(target_ref));
+
+      git_commit* source_commit = nullptr;
+      git_commit_lookup(&source_commit, repo, git_reference_target(source_ref));
+
+      if (git_merge_commits(&index, repo, target_commit, source_commit, &merge_opts) != 0) {
+          // Merge failed (conflicts or error)
+          git_commit_free(source_commit);
+          git_commit_free(target_commit);
+          git_reference_free(target_ref);
+          git_reference_free(source_ref);
+          git_annotated_commit_free(their_head);
+          git_repository_free(repo);
+          return false;
+      }
+
+      if (git_index_has_conflicts(index)) {
+          git_index_free(index);
+          git_commit_free(source_commit);
+          git_commit_free(target_commit);
+          git_reference_free(target_ref);
+          git_reference_free(source_ref);
+          git_annotated_commit_free(their_head);
+          git_repository_free(repo);
+          return false;
+      }
+
+      git_oid tree_oid;
+      git_index_write_tree(&tree_oid, index);
+      git_tree* merge_tree = nullptr;
+      git_tree_lookup(&merge_tree, repo, &tree_oid);
+
+      git_signature* me;
+      git_signature_now(&me, "Codelab System", "system@codelab.local");
+
+      git_oid new_commit_id;
+      const git_commit* parents[2] = { target_commit, source_commit };
+      bool merge_success = (git_commit_create(&new_commit_id, repo, target_ref ? git_reference_name(target_ref) : nullptr, me, me,
+                             nullptr, ("Merge branch '" + source_branch + "' into " + target_branch).c_str(), merge_tree, 2, parents) == 0);
+
+      git_signature_free(me);
+      git_tree_free(merge_tree);
+      git_index_free(index);
+      git_commit_free(source_commit);
+      git_commit_free(target_commit);
+      git_reference_free(target_ref);
+      git_reference_free(source_ref);
+      git_annotated_commit_free(their_head);
+      git_repository_free(repo);
+
+      return merge_success;
+  }
 }

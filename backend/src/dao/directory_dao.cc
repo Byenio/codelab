@@ -148,4 +148,55 @@ namespace codelab::dao
     sqlite3_finalize(stmt);
     return result;
   }
+
+  bool DirectoryDAO::Delete(int id)
+  {
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+
+    std::string sql = "DELETE FROM directories WHERE id = ?;";
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return false;
+
+    sqlite3_bind_int(stmt, 1, id);
+
+    bool success = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return success;
+  }
+
+  bool DirectoryDAO::UpdateParent(int id, std::optional<int> parent_id)
+  {
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+
+    std::string sql = "UPDATE directories SET parent_id = ? WHERE id = ?;";
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return false;
+
+    if (parent_id.has_value()) {
+      sqlite3_bind_int(stmt, 1, parent_id.value());
+    } else {
+      sqlite3_bind_null(stmt, 1);
+    }
+    sqlite3_bind_int(stmt, 2, id);
+
+    bool success = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return success;
+  }
+
+  bool DirectoryDAO::UpdateName(int id, const std::string& name)
+  {
+    auto& db = core::Database::GetInstance();
+    sqlite3_stmt* stmt;
+
+    std::string sql = "UPDATE directories SET name = ? WHERE id = ?;";
+    if (sqlite3_prepare_v2(db.GetHandle(), sql.c_str(), -1, &stmt, nullptr) != SQLITE_OK) return false;
+
+    sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_int(stmt, 2, id);
+
+    bool success = (sqlite3_step(stmt) == SQLITE_DONE);
+    sqlite3_finalize(stmt);
+    return success;
+  }
 }

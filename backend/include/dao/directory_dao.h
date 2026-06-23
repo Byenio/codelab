@@ -14,6 +14,10 @@ namespace codelab::dao
     std::vector<models::Directory> ListByParent(int user_id, std::optional<int> parent_id);
     std::optional<models::Directory> FindById(int id);
     std::optional<models::Directory> FindByName(int user_id, std::optional<int> parent_id, const std::string& name);
+
+    bool Delete(int id);
+    bool UpdateParent(int id, std::optional<int> parent_id);
+    bool UpdateName(int id, const std::string& name);
   };
 }
 

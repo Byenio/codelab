@@ -48,5 +48,28 @@ CREATE TABLE IF NOT EXISTS repositories (
     UNIQUE(user_id, directory_id, name)
 );
 
+CREATE TABLE IF NOT EXISTS collaborators (
+    repository_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY(repository_id, user_id),
+    FOREIGN KEY(repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS pull_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    repository_id INTEGER NOT NULL,
+    author_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    source_branch TEXT NOT NULL,
+    target_branch TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
+    FOREIGN KEY(author_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 CREATE INDEX IF NOT EXISTS idx_directories_parent ON directories(parent_id);
 CREATE INDEX IF NOT EXISTS idx_repositories_owner ON repositories(user_id);

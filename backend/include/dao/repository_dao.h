@@ -17,6 +17,15 @@ namespace codelab::dao
 
     std::vector<models::Repository> ListByDirectory(int user_id, std::optional<int> directory_id);
     std::vector<models::Repository> ListByUser(int user_id);
+
+    bool Delete(int id);
+    bool UpdateDirectory(int id, std::optional<int> new_directory_id);
+
+    // Collaborators
+    bool AddCollaborator(int repo_id, int user_id);
+    bool RemoveCollaborator(int repo_id, int user_id);
+    bool IsCollaborator(int repo_id, int user_id);
+    std::vector<int> ListCollaboratorIds(int repo_id);
   };
 }
 

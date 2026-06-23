@@ -37,3 +37,26 @@ export interface SSHKey {
   created_at: string
   fingerprint?: string
 }
+
+export interface Branch {
+  name: string
+  sha: string
+  is_head: boolean
+}
+
+export interface Collaborator {
+  id: number
+  username: string
+}
+
+export interface PullRequest {
+  id: number
+  repository_id: number
+  author_id: number
+  title: string
+  description: string
+  source_branch: string
+  target_branch: string
+  status: 'open' | 'merged' | 'closed'
+  created_at: string
+}
