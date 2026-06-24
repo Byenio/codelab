@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useApi } from '~/composables/useApi'
+import PullRequestDiffViewer from './PullRequestDiffViewer.vue'
 import type { PullRequest, Branch } from '~/types/models'
 
 const props = defineProps<{
@@ -8,8 +9,10 @@ const props = defineProps<{
 }>()
 
 const isOpen = defineModel<boolean>()
-
 const toast = useToast()
+
+// Track which PR diff is being viewed (null means show list)
+const selectedPrId = ref<number | null>(null)
 
 const { data: prs, refresh } = useApi<PullRequest[]>(`/api/v1/repositories/${props.repoId}/pull-requests`)
 const { data: branches } = useApi<Branch[]>(`/api/v1/repositories/${props.repoId}/branches`)
@@ -63,10 +66,17 @@ const closePR = async (id: number) => {
 </script>
 
 <template>
-  <UModal v-model:open="isOpen" title="Pull Requests">
+  <UModal v-model:open="isOpen" :title="selectedPrId ? 'Pull Request Changes' : 'Pull Requests'">
     <template #body>
-      <div class="space-y-6 max-h-[70vh] overflow-y-auto">
-        <!-- List PRs -->
+      <div v-if="selectedPrId" class="max-h-[70vh] overflow-y-auto">
+        <PullRequestDiffViewer
+            :repo-id="repoId"
+            :pr-id="selectedPrId"
+            @back="selectedPrId = null"
+        />
+      </div>
+
+      <div v-else class="space-y-6 max-h-[70vh] overflow-y-auto">
         <div>
           <h4 class="font-medium text-sm mb-2">Existing Pull Requests</h4>
           <ul v-if="prs?.length" class="divide-y divide-zinc-200 dark:divide-zinc-800 border dark:border-zinc-800 rounded-md">
@@ -82,16 +92,28 @@ const closePR = async (id: number) => {
                   {{ pr.status }}
                 </UBadge>
               </div>
-              <div v-if="pr.status === 'open'" class="flex gap-2 justify-end mt-2">
-                <UButton color="green" size="xs" icon="i-heroicons-check" @click="mergePR(pr.id)">Merge</UButton>
-                <UButton color="red" size="xs" variant="ghost" icon="i-heroicons-x-mark" @click="closePR(pr.id)">Close</UButton>
+
+              <div class="flex gap-2 justify-end items-center mt-2">
+                <UButton
+                    icon="i-heroicons-eye"
+                    size="xs"
+                    color="neutral"
+                    variant="ghost"
+                    @click="selectedPrId = pr.id"
+                >
+                  View Diff
+                </UButton>
+
+                <template v-if="pr.status === 'open'">
+                  <UButton color="green" size="xs" icon="i-heroicons-check" @click="mergePR(pr.id)">Merge</UButton>
+                  <UButton color="red" size="xs" variant="ghost" icon="i-heroicons-x-mark" @click="closePR(pr.id)">Close</UButton>
+                </template>
               </div>
             </li>
           </ul>
           <p v-else class="text-sm text-zinc-500">No pull requests found.</p>
         </div>
 
-        <!-- Create PR -->
         <div class="pt-4 border-t dark:border-zinc-800">
           <h4 class="font-medium text-sm mb-2">Open New PR</h4>
           <div class="flex flex-col gap-3">

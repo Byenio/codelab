@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { ref, computed, watch } from 'vue'
 import { useApi } from '~/composables/useApi'
 import { marked } from 'marked'
+import { codeToHtml } from 'shiki'
 
 const props = defineProps<{
   repo: {
@@ -24,6 +26,33 @@ const currentBranch = computed({
   get: () => (route.query.branch as string) || 'master',
   set: val => router.replace({ query: { ...route.query, branch: val } })
 })
+
+const toast = useToast()
+
+const cloneUrl = computed(() => {
+  const username = route.params.username as string
+  const slug = route.params.slug
+  const repoPath = Array.isArray(slug) ? slug.join('/') : String(slug)
+
+  return `git clone ssh://git@127.0.0.1:2222/${username}/${repoPath}`
+})
+
+const copyCloneUrl = async () => {
+  try {
+    await navigator.clipboard.writeText(cloneUrl.value)
+    toast.add({
+      title: 'Copied!',
+      description: 'Git clone command copied to clipboard.',
+      color: 'success'
+    })
+  } catch (err) {
+    toast.add({
+      title: 'Error',
+      description: 'Failed to copy clone link.',
+      color: 'error'
+    })
+  }
+}
 
 const currentPath = computed(() => (route.query.path as string) || '')
 const viewType = computed(() => (route.query.type as string) || 'tree')
@@ -53,6 +82,70 @@ const { data: fileContent, pending: loadingBlob } = useApi<{ content: string }>(
   immediate: viewType.value === 'blob'
 })
 
+// --- Syntax Highlighting Logic ---
+const highlightedCode = ref('')
+const isHighlighting = ref(false)
+
+// Maps the current file's extension to Shiki's supported grammars
+const getLanguage = (path: string): string => {
+  if (!path) return 'plaintext'
+  const ext = path.split('.').pop()?.toLowerCase()
+  const map: Record<string, string> = {
+    ts: 'typescript',
+    js: 'javascript',
+    vue: 'vue',
+    json: 'json',
+    md: 'markdown',
+    py: 'python',
+    go: 'go',
+    html: 'html',
+    css: 'css',
+    sh: 'bash',
+    bash: 'bash',
+    yml: 'yaml',
+    yaml: 'yaml',
+    rs: 'rust',
+    cs: 'csharp',
+    cpp: 'cpp',
+    cc: 'cpp',
+    h: 'cpp',
+    hpp: 'cpp',
+    c: 'c',
+    java: 'java',
+    php: 'php'
+  }
+  return map[ext || ''] || 'plaintext'
+}
+
+// Watch changes to file content to generate pristine token highlights asynchronously
+watch(
+    () => fileContent.value?.content,
+    async (newContent) => {
+      if (!newContent) {
+        highlightedCode.value = ''
+        return
+      }
+
+      isHighlighting.value = true
+      try {
+        highlightedCode.value = await codeToHtml(newContent, {
+          lang: getLanguage(currentPath.value),
+          themes: {
+            light: 'nord',
+            dark: 'nord',
+          },
+        })
+      } catch (error) {
+        console.error('Failed parsing syntax highlighting:', error)
+        // Fallback if grammar load fails or language is completely unsupported
+        highlightedCode.value = `<pre class="text-sm font-mono p-4">${newContent}</pre>`
+      } finally {
+        isHighlighting.value = false
+      }
+    },
+    { immediate: true }
+)
+
 // 3. Readme
 const hasReadme = computed(() => {
   if (!files.value) return null
@@ -72,18 +165,18 @@ const readmeQuery = computed(() => {
 })
 
 const { data: readmeContent } = useApi<{ content: string }>(
-  readmeUrl,
-  {
-    query: computed(() => {
-      const q: any = {
-        path: hasReadme.value?.name,
-        branch: currentBranch.value
-      }
-      if (props.directoryId) q.directory_id = props.directoryId
-      return q
-    }),
-    watch: [readmeUrl, currentBranch]
-  }
+    readmeUrl,
+    {
+      query: computed(() => {
+        const q: any = {
+          path: hasReadme.value?.name,
+          branch: currentBranch.value
+        }
+        if (props.directoryId) q.directory_id = props.directoryId
+        return q
+      }),
+      watch: [readmeUrl, currentBranch]
+    }
 )
 
 const renderedReadme = computed(() => {
@@ -111,9 +204,7 @@ const { data: commitsData, pending: loadingCommits } = useApi<any[]>(commitsUrl,
 })
 
 // --- Actions ---
-
 const navigateToItem = (item: any) => {
-  // Fix for potential null/undefined item names
   if (!item || !item.name) return
 
   const newPath = currentPath.value ? `${currentPath.value}/${item.name}` : item.name
@@ -156,79 +247,94 @@ const getFileIcon = (file: any) => {
 
 <template>
   <div>
-    <!-- Header -->
     <div class="flex items-center gap-2 mb-6">
       <UIcon
-        name="i-heroicons-book-open"
-        class="w-6 h-6 text-zinc-400"
+          name="i-heroicons-book-open"
+          class="w-6 h-6 text-zinc-400"
       />
       <h1 class="text-2xl font-bold text-zinc-900 dark:text-white">
         {{ repo.name }}
       </h1>
       <UBadge
-        v-if="repo.is_private"
-        color="neutral"
+          v-if="repo.is_private"
+          color="neutral"
       >
         Private
       </UBadge>
     </div>
 
-    <!-- Controls -->
     <div class="mb-4 flex gap-2">
       <UButton
-        v-if="currentPath"
-        icon="i-heroicons-arrow-left"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        @click="goUp"
+          v-if="currentPath"
+          icon="i-heroicons-arrow-left"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          @click="goUp"
       >
         Back
       </UButton>
       <USelectMenu
-        v-model="currentBranch"
-        :items="branchOptions"
-        size="sm"
+          v-model="currentBranch"
+          :items="branchOptions"
+          size="sm"
       />
+
       <UButton
-        icon="i-heroicons-cog-6-tooth"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        @click="isBranchModalOpen = true"
-      />
+          icon="i-heroicons-clipboard"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          title="Copy SSH Clone Command"
+          @click="copyCloneUrl"
+      >
+        Clone
+      </UButton>
+
       <UButton
-        icon="i-heroicons-clock"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        @click="router.push({ query: { ...route.query, type: 'commits' } })"
+          icon="i-heroicons-cog-6-tooth"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          @click="isBranchModalOpen = true"
+      >
+        Branches
+      </UButton>
+      <UButton
+          icon="i-heroicons-clock"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          @click="router.push({ query: { ...route.query, type: 'commits' } })"
       >
         Commits
       </UButton>
       <UButton
-        icon="i-heroicons-users"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        @click="isCollaboratorModalOpen = true"
-      />
+          icon="i-heroicons-users"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          @click="isCollaboratorModalOpen = true"
+      >
+        Collaborators
+      </UButton>
       <UButton
-        icon="i-heroicons-inbox-arrow-down"
-        color="neutral"
-        variant="ghost"
-        size="sm"
-        @click="isPRModalOpen = true"
-      />
+          icon="i-heroicons-inbox-arrow-down"
+          color="neutral"
+          variant="ghost"
+          size="sm"
+          @click="isPRModalOpen = true"
+      >
+        Pull requests
+      </UButton>
       <div class="ml-auto font-mono text-sm text-zinc-400 flex items-center">
         {{ currentPath || '/' }}
       </div>
     </div>
 
-    <!-- VIEW MODE: TREE -->
     <div
-      v-if="viewType === 'tree'"
-      class="space-y-6"
+        v-if="viewType === 'tree'"
+        class="space-y-6"
     >
       <UCard class="p-0 overflow-hidden">
         <div class="border-b border-zinc-100 dark:border-zinc-800 p-3 bg-zinc-50 dark:bg-zinc-900/50 flex justify-between">
@@ -238,38 +344,38 @@ const getFileIcon = (file: any) => {
         </div>
 
         <div
-          v-if="loadingFiles"
-          class="p-8 flex justify-center"
+            v-if="loadingFiles"
+            class="p-8 flex justify-center"
         >
           <UIcon
-            name="i-heroicons-arrow-path"
-            class="animate-spin w-6 h-6 text-zinc-400"
+              name="i-heroicons-arrow-path"
+              class="animate-spin w-6 h-6 text-zinc-400"
           />
         </div>
 
         <div
-          v-else
-          class="divide-y divide-zinc-100 dark:divide-zinc-800"
+            v-else
+            class="divide-y divide-zinc-100 dark:divide-zinc-800"
         >
           <div
-            v-if="currentPath"
-            class="p-2 px-3 text-blue-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer text-sm font-bold"
-            @click="goUp"
+              v-if="currentPath"
+              class="p-2 px-3 text-blue-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer text-sm font-bold"
+              @click="goUp"
           >
             ..
           </div>
 
           <div
-            v-for="file in files"
-            :key="file.path"
-            class="flex items-center justify-between p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group"
-            @click="navigateToItem(file)"
+              v-for="file in files"
+              :key="file.path"
+              class="flex items-center justify-between p-3 px-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer group"
+              @click="navigateToItem(file)"
           >
             <div class="flex items-center gap-3">
               <UIcon
-                :name="getFileIcon(file)"
-                :class="file.is_directory ? 'text-blue-400' : 'text-zinc-400'"
-                class="w-5 h-5"
+                  :name="getFileIcon(file)"
+                  :class="file.is_directory ? 'text-blue-400' : 'text-zinc-400'"
+                  class="w-5 h-5"
               />
               <span class="text-sm text-zinc-700 dark:text-zinc-200 group-hover:text-primary-500 hover:underline">
                 {{ file.name }}
@@ -279,18 +385,17 @@ const getFileIcon = (file: any) => {
           </div>
 
           <div
-            v-if="!files || files.length === 0"
-            class="p-8 text-center text-zinc-400 text-sm"
+              v-if="!files || files.length === 0"
+              class="p-8 text-center text-zinc-400 text-sm"
           >
             Empty repository.
           </div>
         </div>
       </UCard>
 
-      <!-- README PREVIEW -->
       <UCard
-        v-if="readmeContent"
-        class="overflow-hidden"
+          v-if="readmeContent"
+          class="overflow-hidden"
       >
         <template #header>
           <div class="flex items-center gap-2 font-bold text-sm">
@@ -302,70 +407,68 @@ const getFileIcon = (file: any) => {
       </UCard>
     </div>
 
-    <!-- VIEW MODE: BLOB -->
     <UCard
-      v-else-if="viewType === 'blob'"
-      class="overflow-hidden p-0"
+        v-else-if="viewType === 'blob'"
+        class="overflow-hidden p-0"
     >
       <div class="border-b border-zinc-200 dark:border-zinc-800 p-2 bg-zinc-100 dark:bg-zinc-900 flex justify-between items-center">
         <div class="text-sm font-mono text-zinc-600 dark:text-zinc-300 px-2">
           {{ currentPath }}
         </div>
         <UButton
-          icon="i-heroicons-clipboard"
-          color="neutral"
-          variant="ghost"
-          size="xs"
+            icon="i-heroicons-clipboard"
+            color="neutral"
+            variant="ghost"
+            size="xs"
         >
           Copy
         </UButton>
       </div>
 
       <div
-        v-if="loadingBlob"
-        class="p-12 flex justify-center"
+          v-if="loadingBlob || isHighlighting"
+          class="p-12 flex justify-center"
       >
         <UIcon
-          name="i-heroicons-arrow-path"
-          class="animate-spin w-8 h-8 text-zinc-300"
+            name="i-heroicons-arrow-path"
+            class="animate-spin w-8 h-8 text-zinc-300"
         />
       </div>
 
       <div
-        v-else
-        class="overflow-x-auto"
+          v-else
+          class="overflow-x-auto text-sm font-mono p-4"
       >
-        <pre class="text-sm font-mono p-4 text-zinc-800 dark:text-zinc-200">{{ fileContent?.content }}</pre>
+        <div v-html="highlightedCode" class="shiki-container" />
       </div>
     </UCard>
 
-    <!-- VIEW MODE: COMMITS -->
     <UCard
-      v-else-if="viewType === 'commits'"
-      class="overflow-hidden p-0"
+        v-else-if="viewType === 'commits'"
+        class="overflow-hidden p-0"
     >
       <div class="border-b border-zinc-200 dark:border-zinc-800 p-3 bg-zinc-100 dark:bg-zinc-900">
         <h2 class="font-semibold px-1">Commits</h2>
       </div>
 
       <div
-        v-if="loadingCommits"
-        class="p-12 flex justify-center"
+          v-if="loadingCommits"
+          class="p-12 flex justify-center"
       >
         <UIcon
-          name="i-heroicons-arrow-path"
-          class="animate-spin w-8 h-8 text-zinc-300"
+            name="i-heroicons-arrow-path"
+            class="animate-spin w-8 h-8 text-zinc-300"
         />
       </div>
 
       <div
-        v-else
-        class="divide-y divide-zinc-100 dark:divide-zinc-800"
+          v-else
+          class="divide-y divide-zinc-100 dark:divide-zinc-800"
       >
         <div
-          v-for="commit in commitsData"
-          :key="commit.hash"
-          class="p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 flex flex-col gap-2"
+            v-for="commit in commitsData"
+            :key="commit.hash"
+            class="p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 flex flex-col gap-2"
         >
           <div class="flex justify-between items-start">
             <span class="font-bold font-mono text-sm text-zinc-800 dark:text-zinc-200">{{ commit.message }}</span>
@@ -380,8 +483,8 @@ const getFileIcon = (file: any) => {
         </div>
 
         <div
-          v-if="!commitsData || commitsData.length === 0"
-          class="p-8 text-center text-zinc-400 text-sm"
+            v-if="!commitsData || commitsData.length === 0"
+            class="p-8 text-center text-zinc-400 text-sm"
         >
           No commits found on this branch.
         </div>
@@ -389,18 +492,40 @@ const getFileIcon = (file: any) => {
     </UCard>
 
     <BranchManagerModal
-      v-model="isBranchModalOpen"
-      :repo-id="repo.id"
+        v-model="isBranchModalOpen"
+        :repo-id="repo.id"
     />
 
     <CollaboratorManagerModal
-      v-model="isCollaboratorModalOpen"
-      :repo-id="repo.id"
+        v-model="isCollaboratorModalOpen"
+        :repo-id="repo.id"
     />
 
     <PullRequestManagerModal
-      v-model="isPRModalOpen"
-      :repo-id="repo.id"
+        v-model="isPRModalOpen"
+        :repo-id="repo.id"
     />
   </div>
 </template>
+
+<style scoped>
+:deep(.shiki) {
+  background-color: transparent !important;
+  margin: 0;
+  padding: 0;
+}
+:deep(.shiki pre) {
+  background-color: transparent !important;
+  margin: 0;
+  padding: 0;
+}
+
+:deep(html.dark .shiki),
+:deep(html.dark .shiki span) {
+  color: var(--shiki-dark) !important;
+  background-color: transparent !important; /* Keep it blending into your background */
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+</style>

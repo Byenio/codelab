@@ -8,6 +8,7 @@
 #include "services/repo_service.h"
 #include "services/git_http_service.h"
 #include "services/ssh_service.h"
+#include <cstdio>
 
 namespace codelab::api
 {
@@ -795,6 +796,55 @@ namespace codelab::api
         return crow::response(200, "PR Closed");
       }
       return crow::response(500, "Failed to close PR");
+    });
+
+    // Get PR Diff
+    CROW_ROUTE(app, "/api/v1/repositories/<int>/pull-requests/<int>/diff")
+    .methods(crow::HTTPMethod::Get)
+    ([&app](const crow::request& req, int repo_id, int pr_id)
+    {
+      auto& ctx = app.get_context<middleware::AuthMiddleware>(req);
+      dao::RepositoryDAO repo_dao;
+      auto repo = repo_dao.FindById(repo_id);
+      if (!repo) return crow::response(404, "Repository not found");
+
+      bool authorized = !repo->is_private;
+      if (!authorized && ctx.user_id != 0) {
+        if (repo->user_id == ctx.user_id || repo_dao.IsCollaborator(repo->id, ctx.user_id)) authorized = true;
+      }
+      if (!authorized) return crow::response(404, "Repository not found");
+
+      dao::PullRequestDAO pr_dao;
+      auto pr = pr_dao.FindById(pr_id);
+      if (!pr || pr->repository_id != repo_id) return crow::response(404, "Pull request not found");
+
+      std::string storage_path = codelab::core::Config::GetInstance().GetString("REPO_STORAGE_PATH", "../../data/repositories");
+      std::string repo_dir = storage_path + repo->disk_path_hash + ".git";
+
+      if (!std::filesystem::exists(repo_dir)) {
+        crow::json::wvalue res;
+        res["diff"] = "Backend Error: Repository directory does not exist at path: " + repo_dir +
+                      "\nPlease check your REPO_STORAGE_PATH configuration relative to where the server binary is run.";
+        return crow::response(200, res);
+      }
+
+      std::string cmd = "cd " + repo_dir + " && git diff '" + pr->target_branch + "'...'" + pr->source_branch + "' 2>&1";
+
+      std::string diff_output = "";
+      char buffer[128];
+      FILE* pipe = popen(cmd.c_str(), "r");
+      if (!pipe) {
+        return crow::response(500, "Failed to execute git command");
+      }
+
+      while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+        diff_output += buffer;
+      }
+      pclose(pipe);
+
+      crow::json::wvalue res;
+      res["diff"] = diff_output;
+      return crow::response(200, res);
     });
 
     // endregion
