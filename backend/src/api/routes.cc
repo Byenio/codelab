@@ -591,7 +591,6 @@ namespace codelab::api
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
       if (!repo) return crow::response(404, "Repository not found");
-      if (repo->user_id != ctx.user_id) return crow::response(403, "Only the owner can list collaborators");
 
       dao::UserDAO user_dao;
       auto collab_ids = repo_dao.ListCollaboratorIds(repo_id);
@@ -625,7 +624,6 @@ namespace codelab::api
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
       if (!repo) return crow::response(404, "Repository not found");
-      if (repo->user_id != ctx.user_id) return crow::response(403, "Only owner can add collaborators");
 
       dao::UserDAO user_dao;
       auto target_user = user_dao.FindByUsername(target_username);
@@ -651,7 +649,6 @@ namespace codelab::api
       dao::RepositoryDAO repo_dao;
       auto repo = repo_dao.FindById(repo_id);
       if (!repo) return crow::response(404, "Repository not found");
-      if (repo->user_id != ctx.user_id) return crow::response(403, "Only owner can remove collaborators");
 
       dao::UserDAO user_dao;
       auto target_user = user_dao.FindByUsername(target_username);
